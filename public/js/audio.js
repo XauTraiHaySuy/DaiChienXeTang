@@ -8,29 +8,42 @@ class SoundEngine {
 
     init() {
         if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
+            try { window.speechSynthesis.cancel(); } catch (e) { }
         }
         if (!this.ctx) {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            this.ctx = new AudioContext();
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContext();
+            } catch (e) {
+                console.warn('Web Audio API not supported');
+            }
         }
-        if (this.ctx.state === 'suspended') {
-            this.ctx.resume();
+        if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => { });
         }
+    }
+
+    ensureContext() {
+        if (this.muted) return false;
+        if (!this.ctx) {
+            this.init();
+        }
+        if (!this.ctx) return false;
+        return this.ctx.state === 'running';
     }
 
     playShoot(isPlayer = true) {
         if (this.muted || !this.ctx) return;
         const now = this.ctx.currentTime;
-        
+
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        
+
         osc.type = 'sawtooth';
         const startFreq = isPlayer ? 380 : 260;
         osc.frequency.setValueAtTime(startFreq, now);
         osc.frequency.exponentialRampToValueAtTime(30, now + 0.18);
-        
+
         gain.gain.setValueAtTime(isPlayer ? 0.35 : 0.25, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
@@ -43,7 +56,7 @@ class SoundEngine {
     playBounce() {
         if (this.muted || !this.ctx) return;
         const now = this.ctx.currentTime;
-        
+
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sine';
@@ -62,7 +75,7 @@ class SoundEngine {
     playExpire() {
         if (this.muted || !this.ctx) return;
         const now = this.ctx.currentTime;
-        
+
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'triangle';
@@ -129,6 +142,10 @@ class SoundEngine {
         } catch (e) {
             console.log(e);
         }
+    }
+
+    playExplode() {
+        this.playExplosion();
     }
 
     playPause() {
@@ -327,11 +344,245 @@ class SoundEngine {
                 osc.start(now + i * 0.08);
                 osc.stop(now + i * 0.08 + 0.35);
             });
-        } catch (e) {}
+        } catch (e) { }
     }
 
     playLoseVoice() {
         // Disabled / Removed lose sound
+    }
+
+    // ----------------------------------------------------
+    // --- 45S IDLE EASTER EGG SYNTHESIZED SOUND EFFECTS ---
+    // ----------------------------------------------------
+
+    // 1. Heavy Tank Engine Tread Rumble Sound
+    playTankEngineRumble() {
+        if (!this.ensureContext()) return;
+        try {
+            const now = this.ctx.currentTime;
+            const duration = 0.4;
+
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(55, now);
+            osc.frequency.linearRampToValueAtTime(75, now + 0.2);
+            osc.frequency.linearRampToValueAtTime(45, now + duration);
+
+            gain.gain.setValueAtTime(0.18, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + duration);
+        } catch (e) { }
+    }
+
+    // 2. Giant Super Cannon Blast Firing Sound
+    playSuperCannonBlast() {
+        if (!this.ensureContext()) return;
+        try {
+            const now = this.ctx.currentTime;
+            const duration = 0.8;
+
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(450, now);
+            osc.frequency.exponentialRampToValueAtTime(20, now + duration);
+
+            gain.gain.setValueAtTime(0.6, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + duration);
+
+            const bufferSize = this.ctx.sampleRate * duration;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(1200, now);
+            filter.frequency.exponentialRampToValueAtTime(30, now + duration);
+
+            const noiseGain = this.ctx.createGain();
+            noiseGain.gain.setValueAtTime(0.5, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            noise.connect(filter);
+            filter.connect(noiseGain);
+            noiseGain.connect(this.ctx.destination);
+
+            noise.start(now);
+            noise.stop(now + duration);
+        } catch (e) { }
+    }
+
+    // 3. Metallic Title Letter Knockdown Crash Impact Sound
+    playTitleCrash() {
+        if (!this.ensureContext()) return;
+        try {
+            const now = this.ctx.currentTime;
+            const duration = 1.0;
+
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(220, now);
+            osc.frequency.exponentialRampToValueAtTime(40, now + duration);
+
+            gain.gain.setValueAtTime(0.5, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + duration);
+
+            const bufferSize = this.ctx.sampleRate * duration;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const noiseGain = this.ctx.createGain();
+            noiseGain.gain.setValueAtTime(0.4, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+            noise.connect(noiseGain);
+            noiseGain.connect(this.ctx.destination);
+            noise.start(now);
+            noise.stop(now + 0.5);
+        } catch (e) { }
+    }
+
+    // 4. Repairmen Footsteps Running Sound
+    playRepairmenFootsteps() {
+        if (!this.ensureContext()) return;
+        try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(280, now);
+            osc.frequency.exponentialRampToValueAtTime(80, now + 0.05);
+
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.05);
+        } catch (e) { }
+    }
+
+    // 5. Electric Plasma Welding Sizzle & Spark Sound
+    playWeldingSizzle() {
+        if (!this.ensureContext()) return;
+        try {
+            const now = this.ctx.currentTime;
+            const duration = 0.15;
+
+            const bufferSize = this.ctx.sampleRate * duration;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(3000, now);
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+            noise.start(now);
+            noise.stop(now + duration);
+        } catch (e) { }
+    }
+
+    // 6. Hammer Strike Metallic Clink Sound
+    playHammerHit() {
+        if (!this.ensureContext()) return;
+        try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1200, now);
+            osc.frequency.exponentialRampToValueAtTime(400, now + 0.08);
+
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.08);
+        } catch (e) { }
+    }
+
+    // 7. Comic Speech Bubble Pop Sound
+    playPopBubble() {
+        if (!this.ensureContext()) return;
+        try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.exponentialRampToValueAtTime(950, now + 0.08);
+
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.08);
+        } catch (e) { }
+    }
+
+    // 8. Triumphant Title Repaired Victory Chime
+    playTitleRepairedChime() {
+        if (!this.ensureContext()) return;
+        try {
+            const now = this.ctx.currentTime;
+            [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, now + i * 0.07);
+
+                gain.gain.setValueAtTime(0.18, now + i * 0.07);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now + i * 0.07);
+                osc.stop(now + i * 0.07 + 0.3);
+            });
+        } catch (e) { }
     }
 }
 

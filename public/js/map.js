@@ -835,8 +835,12 @@ function updateMapEntities(player, enemies, bullets) {
 // A* PATHFINDING ALGORITHM
 // ----------------------------------------------------
 function checkWallCollideAt(nx, ny, radius = 18) {
-    if (nx < radius || nx > CANVAS_WIDTH - radius ||
-        ny < radius || ny > CANVAS_HEIGHT - radius) {
+    const minX = WALL_THICKNESS + radius;
+    const maxX = CANVAS_WIDTH - WALL_THICKNESS - radius;
+    const minY = WALL_THICKNESS + radius;
+    const maxY = CANVAS_HEIGHT - WALL_THICKNESS - radius;
+
+    if (nx < minX || nx > maxX || ny < minY || ny > maxY) {
         return true;
     }
     for (const w of walls) {

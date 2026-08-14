@@ -89,9 +89,10 @@ function triggerMapRoulette(onComplete) {
         return;
     }
 
-    // Hide other screens & show roulette modal
+    // Hide other screens & game elements during map roulette
     document.getElementById('game-over-screen').classList.add('hidden');
     document.getElementById('start-screen').classList.add('hidden');
+    hideGameElements();
     modal.classList.remove('hidden');
 
     // Build strip: repeat MAP_DEFINITIONS 14 times for smooth long scrolling
@@ -171,12 +172,13 @@ function hideGameElements() {
 document.getElementById('start-btn').addEventListener('click', () => {
     audio.init();
     if (typeof homepageEngine !== 'undefined') homepageEngine.stop();
-    document.getElementById('start-screen').classList.add('hidden');
-    showGameElements();
-    initGame();
-    gameState = 'PLAYING';
-    isPaused = false;
-    updateMapButtonState();
+    triggerMapRoulette((selectedMapIdx) => {
+        showGameElements();
+        initGame(selectedMapIdx);
+        gameState = 'PLAYING';
+        isPaused = false;
+        updateMapButtonState();
+    });
 });
 
 document.getElementById('restart-btn').addEventListener('click', () => {

@@ -27,9 +27,13 @@ class Tank {
     }
 
     checkWallCollide(nx, ny) {
-        // 1. Strict Canvas Map Outer Border Collision Lock
-        if (nx < this.radius || nx > CANVAS_WIDTH - this.radius ||
-            ny < this.radius || ny > CANVAS_HEIGHT - this.radius) {
+        // 1. Strict Canvas Map Outer Border Collision Lock (Accounts for 20px outer metal walls)
+        const minX = WALL_THICKNESS + this.radius;
+        const maxX = CANVAS_WIDTH - WALL_THICKNESS - this.radius;
+        const minY = WALL_THICKNESS + this.radius;
+        const maxY = CANVAS_HEIGHT - WALL_THICKNESS - this.radius;
+
+        if (nx < minX || nx > maxX || ny < minY || ny > maxY) {
             return true;
         }
 
@@ -73,9 +77,14 @@ class Tank {
             moved = true;
         }
 
-        // Hard Boundary Clamp to Canvas Map Limits
-        this.x = Math.max(this.radius, Math.min(CANVAS_WIDTH - this.radius, this.x));
-        this.y = Math.max(this.radius, Math.min(CANVAS_HEIGHT - this.radius, this.y));
+        // Hard Boundary Clamp to Canvas Map Limits (strictly inside 20px outer metal walls)
+        const minX = WALL_THICKNESS + this.radius;
+        const maxX = CANVAS_WIDTH - WALL_THICKNESS - this.radius;
+        const minY = WALL_THICKNESS + this.radius;
+        const maxY = CANVAS_HEIGHT - WALL_THICKNESS - this.radius;
+
+        this.x = Math.max(minX, Math.min(maxX, this.x));
+        this.y = Math.max(minY, Math.min(maxY, this.y));
 
         if (moved) {
             const dist = Math.hypot(this.x - this.lastX, this.y - this.lastY);
@@ -91,6 +100,33 @@ class Tank {
         this.lastY = this.y;
     }
 
+    getValidMuzzlePosition() {
+        const maxMuzzleDist = this.radius + 14;
+        const cos = Math.cos(this.turretAngle);
+        const sin = Math.sin(this.turretAngle);
+
+        let validDist = maxMuzzleDist;
+        let isBlockedByWall = false;
+
+        // Step along barrel trajectory from tank radius out to maxMuzzleDist
+        for (let d = this.radius - 2; d <= maxMuzzleDist; d += 2) {
+            const px = this.x + cos * d;
+            const py = this.y + sin * d;
+            if (typeof checkWallCollideAt === 'function' && checkWallCollideAt(px, py, 6)) {
+                validDist = Math.max(this.radius - 4, d - 4);
+                isBlockedByWall = true;
+                break;
+            }
+        }
+
+        return {
+            x: this.x + cos * validDist,
+            y: this.y + sin * validDist,
+            dist: validDist,
+            isBlockedByWall: isBlockedByWall
+        };
+    }
+
     shoot() {
         if (!this.alive || this.cooldown > 0 || this.stunTimer > 0) return false;
 
@@ -98,15 +134,40 @@ class Tank {
             return false;
         }
 
-        const muzzleDist = this.radius + 14;
-        const bx = this.x + Math.cos(this.turretAngle) * muzzleDist;
-        const by = this.y + Math.sin(this.turretAngle) * muzzleDist;
+        const muzzle = this.getValidMuzzlePosition();
 
-        bullets.push(new Bullet(bx, by, this.turretAngle, this));
+        // 💥 BARREL JAMMED AT POINT-BLANK RANGE AGAINST WALL:
+        // If firing with muzzle jammed against wall, the shot backfires, ricochets backward into the tank, and destroys it ("nổ chết")!
+        if (muzzle.isBlockedByWall) {
+            this.cooldown = 18;
+            this.recoilOffset = 8;
+            if (typeof audio !== 'undefined') {
+                audio.playShoot(this.isPlayer);
+                audio.playExplosion();
+            }
+
+            // Muzzle explosion on near face of wall
+            createMuzzleFlash(muzzle.x, muzzle.y, this.turretAngle, this.isPlayer);
+            createExplosion(muzzle.x, muzzle.y, true);
+
+            // Bounced backward bullet heading right back at the tank
+            const backAngle = this.turretAngle + Math.PI;
+            const backBullet = new Bullet(muzzle.x, muzzle.y, backAngle, this);
+            backBullet.hasBounced = true;
+            bullets.push(backBullet);
+
+            // Tank is destroyed by self-backfire explosion!
+            this.alive = false;
+            createExplosion(this.x, this.y, true);
+
+            return true;
+        }
+
+        bullets.push(new Bullet(muzzle.x, muzzle.y, this.turretAngle, this));
         this.cooldown = 18;
 
         this.recoilOffset = 6;
-        createMuzzleFlash(bx, by, this.turretAngle, this.isPlayer);
+        createMuzzleFlash(muzzle.x, muzzle.y, this.turretAngle, this.isPlayer);
         audio.playShoot(this.isPlayer);
         return true;
     }
@@ -142,17 +203,32 @@ class Tank {
             ctx.restore();
         }
 
-        // 1. Headlight / Laser Sight
+        // 1. Headlight / Laser Sight (Truncated at nearest wall face)
+        let laserDist = 180;
+        const cosT = Math.cos(this.turretAngle);
+        const sinT = Math.sin(this.turretAngle);
+        if (typeof checkWallCollideAt === 'function') {
+            for (let d = 20; d <= 180; d += 6) {
+                const lx = this.x + cosT * d;
+                const ly = this.y + sinT * d;
+                if (checkWallCollideAt(lx, ly, 3)) {
+                    laserDist = d;
+                    break;
+                }
+            }
+        }
+
         ctx.save();
         ctx.rotate(this.turretAngle);
-        const grad = ctx.createLinearGradient(0, 0, 180, 0);
+        const laserWidthAtEnd = Math.max(3, (laserDist / 180) * 18);
+        const grad = ctx.createLinearGradient(0, 0, laserDist, 0);
         grad.addColorStop(0, this.isPlayer ? 'rgba(56, 189, 248, 0.25)' : 'rgba(239, 68, 68, 0.25)');
         grad.addColorStop(1, 'transparent');
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.moveTo(10, 0);
-        ctx.lineTo(180, -18);
-        ctx.lineTo(180, 18);
+        ctx.lineTo(laserDist, -laserWidthAtEnd);
+        ctx.lineTo(laserDist, laserWidthAtEnd);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
@@ -211,7 +287,10 @@ class Tank {
         ctx.save();
         ctx.rotate(this.turretAngle);
 
-        const barrelLength = this.radius + 12 - this.recoilOffset;
+        const muzzleInfo = this.getValidMuzzlePosition();
+        const maxBarrelLen = this.radius + 12 - this.recoilOffset;
+        const barrelLength = Math.max(4, Math.min(maxBarrelLen, muzzleInfo.dist - this.recoilOffset));
+
         const barrelGrad = ctx.createLinearGradient(0, -4, 0, 4);
         barrelGrad.addColorStop(0, '#64748b');
         barrelGrad.addColorStop(0.5, '#1e293b');
