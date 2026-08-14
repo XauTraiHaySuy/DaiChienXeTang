@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đại Chiến Xe Tăng - Tank Battle Blitzkrieg</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: #030712;
+            color: #c9d1d9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Homepage Background Canvas */
+        #menu-bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            display: block;
+        }
+
+        #game-container {
+            position: relative;
+            z-index: 5;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            border-radius: 0;
+            overflow: hidden;
+            border: none;
+            box-shadow: none;
+            background: transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas#gameCanvas {
+            display: block;
+            background-color: #0b0f19;
+            cursor: crosshair;
+        }
+
+        /* Overlay UI Screens */
+        .overlay-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            backdrop-filter: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            transition: opacity 0.3s ease;
+            padding: 24px;
+            overflow: hidden;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Title Design - Đại Chiến XE TĂNG */
+        .main-menu-header {
+            text-align: center;
+            margin-bottom: 20px;
+            animation: fadeInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .title-badge {
+            display: inline-block;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #38bdf8;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            padding: 4px 16px;
+            border-radius: 20px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+        }
+
+        .main-title {
+            font-size: 3.8rem;
+            font-weight: 900;
+            line-height: 1.1;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.8));
+        }
+
+        .title-dc {
+            color: #f8fafc;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(250, 204, 21, 0.4);
+            background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Xe - Color of Green Tank (Xanh) */
+        .title-xe {
+            color: #38bdf8;
+            background: linear-gradient(180deg, #38bdf8 0%, #22c55e 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(56, 189, 248, 0.9), 0 0 50px rgba(34, 197, 94, 0.7);
+            margin: 0 6px;
+            display: inline-block;
+            animation: pulseGlowGreen 2.5s infinite alternate;
+        }
+
+        /* Tăng - Color of Red Tank (Đỏ) */
+        .title-tang {
+            color: #ef4444;
+            background: linear-gradient(180deg, #ff4d4d 0%, #dc2626 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(239, 68, 68, 0.9), 0 0 50px rgba(248, 113, 113, 0.7);
+            margin: 0 6px;
+            display: inline-block;
+            animation: pulseGlowRed 2.5s infinite alternate;
+        }
+
+        .title-sub {
+            color: #94a3b8;
+            font-size: 1.15rem;
+            font-weight: 500;
+        }
+
+        @keyframes pulseGlowGreen {
+            0% {
+                filter: drop-shadow(0 0 15px rgba(56, 189, 248, 0.7));
+            }
+
+            100% {
+                filter: drop-shadow(0 0 35px rgba(34, 197, 94, 0.9));
+            }
+        }
+
+        @keyframes pulseGlowRed {
+            0% {
+                filter: drop-shadow(0 0 15px rgba(239, 68, 68, 0.7));
+            }
+
+            100% {
+                filter: drop-shadow(0 0 35px rgba(248, 113, 113, 0.9));
+            }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Vertical Button Layout Stack */
+        .vertical-menu-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            width: 100%;
+            max-width: 360px;
+            margin: 20px 0;
+            animation: fadeInUp 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .v-menu-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px 22px;
+            font-size: 1.05rem;
+            font-weight: 800;
+            border-radius: 10px;
+            border: 1.5px solid transparent;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+        }
+
+        .v-menu-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .v-menu-btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+            color: #ffffff;
+            border-color: #38bdf8;
+            box-shadow: 0 12px 25px rgba(37, 99, 235, 0.55), 0 0 20px rgba(56, 189, 248, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+        }
+
+        .btn-start:hover {
+            transform: translateY(-5px) scale(1.03);
+            background: linear-gradient(135deg, #0369a1 0%, #1d4ed8 100%);
+            box-shadow: 0 18px 35px rgba(37, 99, 235, 0.8), 0 0 30px rgba(56, 189, 248, 0.7);
+        }
+
+        .btn-coop {
+            background: linear-gradient(135deg, #7e22ce 0%, #a855f7 100%);
+            color: #ffffff;
+            border-color: #c084fc;
+            box-shadow: 0 12px 25px rgba(168, 85, 247, 0.45), 0 0 20px rgba(192, 132, 252, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+        }
+
+        .btn-coop:hover {
+            transform: translateY(-5px) scale(1.03);
+            background: linear-gradient(135deg, #6b21a8 0%, #9333ea 100%);
+            box-shadow: 0 18px 35px rgba(168, 85, 247, 0.75), 0 0 30px rgba(192, 132, 252, 0.7);
+        }
+
+        .btn-account {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #cbd5e1;
+            border-color: #475569;
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.7), 0 0 15px rgba(148, 163, 184, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-account:hover {
+            transform: translateY(-5px) scale(1.03);
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: #ffffff;
+            border-color: #94a3b8;
+            box-shadow: 0 18px 35px rgba(15, 23, 42, 0.9), 0 0 25px rgba(148, 163, 184, 0.4);
+        }
+
+        .v-menu-btn:active {
+            transform: translateY(-1px) scale(0.98);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .info-card {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid #334155;
+            padding: 16px 22px;
+            border-radius: 12px;
+            margin: 6px 0;
+            width: 100%;
+            max-width: 600px;
+            text-align: left;
+            line-height: 1.6;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .info-card h3 {
+            color: #f1f5f9;
+            margin-bottom: 6px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 4px;
+            font-size: 1.1rem;
+        }
+
+        .key-badge {
+            background: #1e293b;
+            color: #38bdf8;
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-weight: bold;
+            border: 1px solid #3b82f6;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #0284c7, #2563eb);
+            color: white;
+            border: none;
+            padding: 12px 35px;
+            font-size: 1.15rem;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.5);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(37, 99, 235, 0.7);
+        }
+
+        /* Dedicated Top Header Bar HUD */
+        #hud {
+            position: relative;
+            width: 100%;
+            padding: 10px 20px;
+            background: rgba(15, 23, 42, 0.98);
+            border-bottom: 2px solid #1e293b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 5;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .hud-item {
+            background: #1e293b;
+            padding: 6px 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .player-color {
+            color: #38bdf8;
+        }
+
+        .enemy-color {
+            color: #f87171;
+        }
+
+        .bullet-color {
+            color: #facc15;
+        }
+
+        .map-color {
+            color: #c084fc;
+        }
+
+        /* Action Buttons Bar */
+        .controls-bar {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            z-index: 5;
+            display: flex;
+            gap: 10px;
+        }
+
+        .hud-btn {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid #475569;
+            color: #cbd5e1;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .hud-btn:hover:not(:disabled) {
+            background: #334155;
+            color: #fff;
+            transform: translateY(-2px);
+        }
+
+        /* Modal Dialog Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(3, 7, 18, 0.85);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            background: rgba(15, 23, 42, 0.95);
+            border: 2px solid #3b82f6;
+            border-radius: 16px;
+            padding: 30px;
+            width: 480px;
+            max-width: 90vw;
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.4);
+            position: relative;
+            animation: zoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes zoomIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 18px;
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: #fff;
+        }
+
+        .auth-tabs {
+            display: flex;
+            border-bottom: 2px solid #334155;
+            margin-bottom: 20px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .auth-tab.active {
+            color: #38bdf8;
+            border-bottom: 3px solid #38bdf8;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            color: #cbd5e1;
+            font-size: 0.9rem;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: #38bdf8;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+        }
+
+        /* Map Roulette Wheel Animation Styles */
+        .roulette-box {
+            background: rgba(15, 23, 42, 0.95);
+            border: 2px solid #a855f7;
+            border-radius: 20px;
+            padding: 30px 40px;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(168, 85, 247, 0.5), inset 0 0 20px rgba(168, 85, 247, 0.2);
+            width: 860px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .roulette-track-container {
+            position: relative;
+            width: 800px;
+            height: 150px;
+            background: rgba(2, 6, 23, 0.9);
+            border: 2px solid #475569;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.8);
+        }
+
+        .roulette-center-frame {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 220px;
+            height: 130px;
+            border: 3.5px solid #facc15;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(250, 204, 21, 0.9), inset 0 0 15px rgba(250, 204, 21, 0.5);
+            z-index: 10;
+            pointer-events: none;
+            background: rgba(250, 204, 21, 0.05);
+        }
+
+        .roulette-strip {
+            display: flex;
+            gap: 20px;
+            position: absolute;
+            top: 10px;
+            left: 0;
+            height: 130px;
+            align-items: center;
+            will-change: transform;
+        }
+
+        .roulette-card {
+            width: 200px;
+            height: 120px;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border: 2px solid #3b82f6;
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            flex-shrink: 0;
+            transition: all 0.3s;
+        }
+
+        .roulette-card h4 {
+            color: #38bdf8;
+            font-size: 0.95rem;
+            margin-bottom: 6px;
+        }
+
+        .roulette-card p {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            line-height: 1.2;
+        }
+
+        .roulette-card.winner {
+            border-color: #facc15;
+            box-shadow: 0 0 25px #facc15;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Full Screen Animated Canvas Background -->
+    <canvas id="menu-bg-canvas"></canvas>
+
+    <div id="game-container">
+        <!-- HUD Bar -->
+        <div id="hud" class="hidden">
+            <div class="hud-item map-color">
+                <span>🗺️ Bản đồ: <strong id="hud-map-title">1. Rừng Rậm Hổ Dữ</strong></span>
+            </div>
+            <div class="hud-item player-color">
+                <span>🔵 Phe Xanh (Bạn): <strong id="player-status">Sống</strong></span>
+            </div>
+            <div class="hud-item bullet-color">
+                <span>💣 Đạn đang bay: <strong id="bullet-count">0 / 3</strong></span>
+            </div>
+            <div class="hud-item enemy-color">
+                <span>🔴 Phe Đỏ (Địch): <strong id="enemy-count">2</strong></span>
+            </div>
+            <div class="hud-item" style="color: #4ade80;">
+                <span>🏆 Tiêu diệt: <strong id="kill-count">0</strong></span>
+            </div>
+            <div id="user-badge-header" class="hud-item hidden" style="color: #facc15;">
+                <span>🎖️ Cmdr. User</span>
+            </div>
+        </div>
+
+        <!-- Action Control Buttons -->
+        <div class="controls-bar hidden">
+            <button id="home-btn" class="hud-btn" style="color: #facc15;">🏠 Trang Chủ</button>
+            <button id="pause-toggle" class="hud-btn">⏸️ Tạm Dừng (P)</button>
+            <button id="change-map-btn" class="hud-btn">🗺️ Đổi Bản Đồ</button>
+            <button id="sound-toggle" class="hud-btn">🔊 Âm thanh: BẬT</button>
+        </div>
+
+        <!-- Canvas (1200x750) -->
+        <canvas id="gameCanvas" width="1200" height="750" class="hidden"></canvas>
+
+        <!-- New Animated Homepage Screen -->
+        <div id="start-screen" class="overlay-screen">
+            <div class="main-menu-header">
+                <h1 class="main-title">
+                    <span class="title-dc">ĐẠI CHIẾN</span>
+                    <span class="title-xe">XE</span>
+                    <span class="title-tang">TĂNG</span>
+                </h1>
+            </div>
+
+            <!-- Vertical Stack Menu Buttons -->
+            <div class="vertical-menu-stack">
+                <button id="start-btn" class="v-menu-btn btn-start">
+                    <span>🚀</span> BẮT ĐẦU
+                </button>
+                <button id="coop-btn" class="v-menu-btn btn-coop">
+                    <span>👥</span> CHƠI NHIỀU NGƯỜI (CO OP)
+                </button>
+                <button id="auth-btn" class="v-menu-btn btn-account">
+                    <span>🔑</span> <span id="auth-btn-text">ĐĂNG NHẬP TÀI KHOẢN</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Pause Screen Overlay -->
+        <div id="pause-screen" class="overlay-screen hidden">
+            <h2 style="color: #facc15; text-shadow: 0 0 20px rgba(250, 204, 21, 0.6);">⏸️ TRẬN ĐẤU TẠM DỪNG</h2>
+            <p style="color: #cbd5e1; font-size: 1.2rem; margin-bottom: 25px;">Nhấn phím <span
+                    class="key-badge">P</span> hoặc bấm nút dưới đây để tiếp tục</p>
+            <button onclick="togglePause()" class="btn">TIẾP TỤC BẮN</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="overlay-screen hidden">
+            <h2 id="game-over-title" class="lose-title">GAME OVER</h2>
+            <p id="game-over-msg" style="margin-bottom: 15px; color: #cbd5e1;">Xe tăng Phe Xanh đã bị tiêu diệt!</p>
+            <p style="color: #94a3b8; font-size: 1.15rem; margin-bottom: 22px;">
+                Số xe tăng địch tiêu diệt: <strong id="final-kills" style="color: #facc15;">0</strong>
+            </p>
+            <div style="display: flex; gap: 15px;">
+                <button id="restart-btn" class="btn">TÁI CHẤN (TRẬN MỚI)</button>
+                <button id="over-home-btn" class="btn" style="background: linear-gradient(135deg, #334155, #1e293b);">VỀ
+                    TRANG CHỦ</button>
+            </div>
+        </div>
+
+        <!-- Map Selection Roulette Modal Animation -->
+        <div id="map-roulette-modal" class="overlay-screen hidden">
+            <div class="roulette-box">
+                <h2
+                    style="color: #facc15; font-size: 2rem; margin-bottom: 5px; text-shadow: 0 0 20px rgba(250, 204, 21, 0.6);">
+                    🎰 ĐANG QUAY CHỌN BẢN ĐỒ TỰ ĐỘNG...</h2>
+                <p style="color: #cbd5e1; font-size: 1.15rem; margin-bottom: 20px;">Hệ thống đang cuộn chọn ngẫu nhiên
+                    bản đồ cho trận đấu mới (3 giây)</p>
+
+                <!-- Track Container -->
+                <div class="roulette-track-container">
+                    <div class="roulette-center-frame"></div>
+                    <div id="roulette-strip" class="roulette-strip"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Co-op Multiplayer Modal -->
+    <div id="coop-modal" class="modal-overlay hidden">
+        <div class="modal-box" style="border-color: #a855f7;">
+            <button id="coop-modal-close" class="modal-close">&times;</button>
+            <h2
+                style="color: #c084fc; font-size: 1.8rem; margin-bottom: 10px; text-shadow: 0 0 15px rgba(168,85,247,0.6);">
+                ⚔️ CHƠI NHIỀU NGƯỜI (CO OP)
+            </h2>
+            <p style="color: #cbd5e1; font-size: 0.95rem; margin-bottom: 20px;">Kết nối trực tuyến real-time với đồng
+                đội qua Socket.io Server</p>
+
+            <div
+                style="background: #0f172a; padding: 15px; border-radius: 10px; border: 1px solid #334155; margin-bottom: 20px; text-align: left;">
+                <p style="color: #4ade80; margin-bottom: 6px;">🌐 <strong>Trạng thái Server:</strong> Đã kết nối
+                    Socket.io</p>
+                <p style="color: #cbd5e1; font-size: 0.9rem;">Tự động đồng bộ vị trí xe tăng, nòng bắn và hiệu ứng đạn
+                    với người chơi khác.</p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <button class="v-menu-btn btn-start" style="font-size: 1rem; padding: 12px;"
+                    onclick="alert('⚡ Đã tham gia phòng Multiplayer thành công! Sẵn sàng chiến đấu.')">
+                    🎮 GHÉP TRẬN MÁY CHỦ CHÍNH
+                </button>
+                <button class="v-menu-btn btn-account" style="font-size: 1rem; padding: 12px;"
+                    onclick="alert('🔑 Mã phòng của bạn: TANK-' + Math.floor(1000 + Math.random()*9000))">
+                    🔑 TẠO PHÒNG RIÊNG
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Auth Modal -->
+    <div id="auth-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <button id="auth-modal-close" class="modal-close">&times;</button>
+            <div class="auth-tabs">
+                <button id="tab-login" class="auth-tab active">ĐĂNG NHẬP</button>
+                <button id="tab-register" class="auth-tab">ĐĂNG KÝ MỚI</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="form-login">
+                <div class="form-group">
+                    <label for="login-username">Tên tài khoản</label>
+                    <input type="text" id="login-username" class="form-input" placeholder="Nhập username..." required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Mật khẩu</label>
+                    <input type="password" id="login-password" class="form-input" placeholder="Nhập mật khẩu..."
+                        required>
+                </div>
+                <button type="submit" class="v-menu-btn btn-start"
+                    style="width: 100%; font-size: 1.05rem; padding: 12px; margin-top: 10px;">
+                    🔑 ĐĂNG NHẬP
+                </button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="form-register" class="hidden">
+                <div class="form-group">
+                    <label for="reg-username">Tên tài khoản mới</label>
+                    <input type="text" id="reg-username" class="form-input" placeholder="Tên muốn đăng ký..." required>
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">Mật khẩu</label>
+                    <input type="password" id="reg-password" class="form-input" placeholder="Tạo mật khẩu..." required>
+                </div>
+                <button type="submit" class="v-menu-btn btn-coop"
+                    style="width: 100%; font-size: 1.05rem; padding: 12px; margin-top: 10px;">
+                    📝 TẠO TÀI KHOẢN
+                </button>
+            </form>
+
+            <div id="auth-status-msg" style="margin-top: 15px; font-size: 0.95rem; font-weight: 600; min-height: 24px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- Socket.io Client Library -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        socket.on('connect', () => {
+            console.log('⚡ Đã kết nối tới Server Socket.io! ID:', socket.id);
+        });
+    </script>
+
+    <!-- Modular JavaScript Files -->
+    <script src="js/audio.js"></script>
+    <script src="js/particle.js"></script>
+    <script src="js/tank.js"></script>
+    <script src="js/bullet.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/homepage.js"></script>
+    <script src="js/game.js"></script>
+</body>
+
+</html>
