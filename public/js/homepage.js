@@ -16,9 +16,9 @@ class HomepageEngine {
         this.lastJetTime = 0;
         this.user = null;
 
-        // --- 45s Idle Easter Egg Properties ---
+        // --- 10s Idle Easter Egg Properties ---
         this.lastActivityTime = Date.now();
-        this.idleTimeout = 45000; // 45 seconds timeout
+        this.idleTimeout = 10000; // 10 seconds timeout per user directive
         this.idleSeqState = 'IDLE'; // 'IDLE', 'TANKS_ENTERING', 'SHOOTING', 'TANKS_EXITING', 'REPAIRMEN_ENTERING', 'REPAIRING', 'CURSING', 'REPAIRMEN_EXITING'
         this.idleSeqTimer = 0;
         this.superTanks = [];
@@ -30,6 +30,9 @@ class HomepageEngine {
         this.titleRepaired = false;
         this.titleDamagedXe = false;
         this.titleDamagedTang = false;
+        this.wreckedTanks = [];
+        this.craters = [];
+        this.battleRocks = [];
     }
 
     init() {
@@ -38,9 +41,14 @@ class HomepageEngine {
         this.ctx = this.canvas.getContext('2d');
 
         this.resize();
-        window.addEventListener('resize', () => this.resize());
+        this.updateTitleRects();
+        window.addEventListener('resize', () => {
+            this.resize();
+            this.updateTitleRects();
+        });
 
         this.spawnInitialTanks();
+        this.spawnWreckedTanks();
         this.spawnJet();
         this.spawnHelicopter();
 
@@ -54,6 +62,7 @@ class HomepageEngine {
         if (!this.canvas) return;
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
+        this.spawnWreckedTanks();
     }
 
     start() {
@@ -181,6 +190,80 @@ class HomepageEngine {
             shootInterval: 1700,
             hp: 100
         });
+    }
+
+    spawnWreckedTanks() {
+        const w = this.canvas ? this.canvas.width : window.innerWidth;
+        const h = this.canvas ? this.canvas.height : window.innerHeight;
+
+        // Tank Tread Scars / Track Trails on battlefield ground (Vết bánh xích cày xới)
+        this.treadTracks = [
+            { x1: w * 0.05, y1: h * 0.3, x2: w * 0.35, y2: h * 0.38 },
+            { x1: w * 0.65, y1: h * 0.62, x2: w * 0.95, y2: h * 0.72 },
+            { x1: w * 0.12, y1: h * 0.8, x2: w * 0.42, y2: h * 0.85 }
+        ];
+
+        // Sandbag barricades / defense lines (Chướng ngại vật bao cát chiến trường)
+        this.sandbagBarriers = [
+            { x: w * 0.28, y: h * 0.22, angle: 0.25 },
+            { x: w * 0.72, y: h * 0.78, angle: -0.35 },
+            { x: w * 0.45, y: h * 0.85, angle: 0.8 }
+        ];
+
+        // Generate small gravel rocks and battlefield debris
+        this.battleRocks = [];
+        for (let i = 0; i < 40; i++) {
+            this.battleRocks.push({
+                x: Math.random() * w,
+                y: Math.random() * h,
+                r: Math.random() * 2 + 1,
+                color: Math.random() > 0.5 ? '#1a0d06' : '#0e0602'
+            });
+        }
+
+        // Create battlefield craters with irregular organic shapes (Rải rác không đều nhau, méo mó tự nhiên)
+        this.craters = [
+            { x: w * 0.14, y: h * 0.22, radius: 46 }, // Top-Left crater
+            { x: w * 0.27, y: h * 0.78, radius: 40 }, // Lower-Middle-Left crater
+            { x: w * 0.76, y: h * 0.35, radius: 42 }, // Upper-Right crater
+            { x: w * 0.88, y: h * 0.65, radius: 50 }, // Far-Lower-Right crater
+            { x: w * 0.44, y: h * 0.88, radius: 54 }  // Asymmetric bottom-center crater
+        ];
+
+        // Generate non-circular, irregular natural shape points for each crater
+        this.craters.forEach(c => {
+            const numPts = 16;
+            c.outerPoints = [];
+            c.innerPoints = [];
+            for (let i = 0; i < numPts; i++) {
+                const angle = (i / numPts) * Math.PI * 2;
+                // Deform radius between 0.75x and 1.25x for dynamic natural jaggedness
+                const rOuter = c.radius * (0.75 + Math.random() * 0.5);
+                const rInner = c.radius * 0.48 * (0.7 + Math.random() * 0.5);
+                c.outerPoints.push({
+                    x: Math.cos(angle) * rOuter,
+                    y: Math.sin(angle) * rOuter
+                });
+                c.innerPoints.push({
+                    x: Math.cos(angle) * rInner,
+                    y: Math.sin(angle) * rInner
+                });
+            }
+        });
+
+        // Single unified dynamic battlefield wind angle for ALL 4 wrecked tanks per F5 session!
+        this.sessionWindAngle = (Math.random() - 0.5) * 2.2 - Math.PI / 2; // Random unified angle (-153 deg to -27 deg)
+
+        this.wreckedTanks = [
+            // Left Green Tank 1 (Top-Left battlefield zone)
+            { x: w * 0.14 + 5, y: h * 0.22 - 4, angle: 0.85, turretAngle: 2.1, team: 'green' },
+            // Left Green Tank 2 (Lower-Middle-Left zone)
+            { x: w * 0.27 - 6, y: h * 0.78 + 5, angle: -1.2, turretAngle: -0.4, team: 'green' },
+            // Right Red Tank 1 (Upper-Right zone)
+            { x: w * 0.76 - 4, y: h * 0.35 + 6, angle: -2.1, turretAngle: 0.6, team: 'red' },
+            // Right Red Tank 2 (Far-Lower-Right zone)
+            { x: w * 0.88 + 5, y: h * 0.65 - 4, angle: 1.65, turretAngle: -2.4, team: 'red' }
+        ];
     }
 
     spawnJet() {
@@ -395,21 +478,132 @@ class HomepageEngine {
             }
         }
 
-        // Update Particles
+        // Continuous dark battlefield smoke plume from 4 wrecked tanks drifting IN UNIFIED BATTLEFIELD WIND DIRECTION
+        if (this.wreckedTanks && Math.random() < 0.45) {
+            const windAngle = (this.sessionWindAngle !== undefined && this.sessionWindAngle !== null) ? this.sessionWindAngle : (-Math.PI / 2);
+
+            this.wreckedTanks.forEach(wt => {
+                // ALL 4 wrecked tanks blow smoke together in the EXACT SAME UNIFIED WIND DIRECTION!
+                const angle = windAngle + (Math.random() - 0.5) * 0.08;
+                const smokeSpeed = Math.random() * 0.15 + 0.35; // Fast visible drift speed (~0.42px/frame)
+
+                this.particles.push({
+                    type: 'slow_smoke',
+                    x: wt.x + (Math.random() - 0.5) * 6,       // Engine deck origin
+                    y: wt.y - 6,
+                    initialY: wt.y - 6,
+                    vx: Math.cos(angle) * smokeSpeed + (Math.random() - 0.5) * 0.02,
+                    vy: Math.sin(angle) * smokeSpeed + (Math.random() - 0.5) * 0.02,
+                    radius: Math.random() * 4 + 6,                             // 1.5x thicker smoke (6px - 10px)
+                    growth: Math.random() * 0.03 + 0.035,                     // 1.5x plume expansion
+                    color: wt.team === 'green' ? 'rgba(45, 40, 35, 0.55)' : 'rgba(55, 48, 40, 0.50)', // Soft translucent grey-charcoal
+                    alpha: 0.55,                                              // Soft translucent smoke
+                    decay: 0.0035                                             // Smooth fade out
+                });
+            });
+        }
+
+        // Continuous Title Fire & Spark Particle Emitter (Siêu mượt, lững lờ cực chậm)
+        if (!this.titleXeRect || !this.titleTangRect) {
+            this.updateTitleRects();
+        }
+
+        const activeTitleCount = this.particles.filter(p => p.type === 'title_fire' || p.type === 'title_spark').length;
+
+        if (activeTitleCount < 20) {
+            // Chữ XE (Phe Xanh)
+            if (this.titleXeRect && !this.titleDamagedXe && this.titleXeRect.width > 0) {
+                const r = this.titleXeRect;
+                if (Math.random() < 0.12) {
+                    const xeFireColors = ['#38bdf8', '#22c55e', '#7dd3fc', '#a7f3d0', '#facc15'];
+                    this.particles.push({
+                        type: 'title_fire',
+                        x: r.left + Math.random() * r.width,
+                        y: r.bottom - Math.random() * (r.height * 0.35),
+                        vx: (Math.random() - 0.5) * 0.1,
+                        vy: -Math.random() * 0.25 - 0.15, // Ultra-slow rising flame
+                        radius: Math.random() * 6 + 3,
+                        color: xeFireColors[Math.floor(Math.random() * xeFireColors.length)],
+                        alpha: 0.85,
+                        decay: 0.008
+                    });
+                }
+                if (Math.random() < 0.06) {
+                    this.particles.push({
+                        type: 'title_spark',
+                        x: r.left + Math.random() * r.width,
+                        y: r.top + Math.random() * r.height,
+                        vx: (Math.random() - 0.5) * 0.2,
+                        vy: -Math.random() * 0.4 - 0.2, // Ultra-slow rising sparks
+                        radius: Math.random() * 2 + 1,
+                        color: Math.random() > 0.3 ? '#38bdf8' : '#facc15',
+                        alpha: 0.9,
+                        decay: 0.012
+                    });
+                }
+            }
+
+            // Chữ TĂNG (Phe Đỏ)
+            if (this.titleTangRect && !this.titleDamagedTang && this.titleTangRect.width > 0) {
+                const r = this.titleTangRect;
+                if (Math.random() < 0.12) {
+                    const tangFireColors = ['#ef4444', '#f87171', '#fb923c', '#fde047', '#ff4d4d'];
+                    this.particles.push({
+                        type: 'title_fire',
+                        x: r.left + Math.random() * r.width,
+                        y: r.bottom - Math.random() * (r.height * 0.35),
+                        vx: (Math.random() - 0.5) * 0.1,
+                        vy: -Math.random() * 0.25 - 0.15, // Ultra-slow rising flame
+                        radius: Math.random() * 6 + 3,
+                        color: tangFireColors[Math.floor(Math.random() * tangFireColors.length)],
+                        alpha: 0.85,
+                        decay: 0.008
+                    });
+                }
+                if (Math.random() < 0.06) {
+                    this.particles.push({
+                        type: 'title_spark',
+                        x: r.left + Math.random() * r.width,
+                        y: r.top + Math.random() * r.height,
+                        vx: (Math.random() - 0.5) * 0.2,
+                        vy: -Math.random() * 0.4 - 0.2, // Ultra-slow rising sparks
+                        radius: Math.random() * 2 + 1,
+                        color: Math.random() > 0.3 ? '#ef4444' : '#fde047',
+                        alpha: 0.9,
+                        decay: 0.012
+                    });
+                }
+            }
+        }
+
+        // Update Particles with Safety Cleanup
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
-            if (p.type === 'smoke' || p.type === 'fire' || p.type === 'heavy_smoke') {
+            if (p.type === 'smoke' || p.type === 'fire' || p.type === 'heavy_smoke' || p.type === 'slow_smoke' || p.type === 'title_fire' || p.type === 'title_spark') {
                 p.x += p.vx || 0;
                 p.y += p.vy || 0;
-                if (p.type === 'heavy_smoke') {
-                    p.radius += 0.18;
+                if (p.type === 'title_fire') {
+                    p.radius *= 0.95; // Flame shrinks slightly as it licks upward
+                } else if (p.type === 'heavy_smoke' || p.type === 'slow_smoke') {
+                    p.radius += (p.growth || 0.18); // Rapid expansion as it ascends to top!
+                    if (p.type === 'heavy_smoke' && p.initialY) {
+                        p.x += Math.sin((p.initialY - p.y) * 0.08) * 0.14; // Natural organic turbulence sway!
+                    }
                 }
                 p.alpha -= p.decay || 0.02;
                 if (p.alpha <= 0) this.particles.splice(i, 1);
             } else if (p.type === 'track') {
-                p.life -= p.decay;
+                p.life -= (p.decay || 0.02);
                 if (p.life <= 0) this.particles.splice(i, 1);
+            } else {
+                // Safety cleanup for unhandled particle types
+                this.particles.splice(i, 1);
             }
+        }
+
+        // Safety soft cap if array exceeds 350 particles
+        if (this.particles.length > 350) {
+            this.particles = this.particles.filter(p => p.alpha > 0.1);
         }
     }
 
@@ -467,29 +661,231 @@ class HomepageEngine {
         const w = this.canvas.width;
         const h = this.canvas.height;
 
-        // Clear canvas with dark gradient
-        const bgGradient = this.ctx.createRadialGradient(w / 2, h / 2, 100, w / 2, h / 2, Math.max(w, h));
-        bgGradient.addColorStop(0, '#0f172a');
-        bgGradient.addColorStop(0.6, '#090d16');
-        bgGradient.addColorStop(1, '#030712');
+        let offsetX = 0;
+        let offsetY = 0;
+        if (this.screenShake > 0) {
+            offsetX = (Math.random() - 0.5) * this.screenShake;
+            offsetY = (Math.random() - 0.5) * this.screenShake;
+            this.screenShake *= 0.88;
+            if (this.screenShake < 0.5) this.screenShake = 0;
+        }
+
+        this.ctx.save();
+        if (offsetX !== 0 || offsetY !== 0) {
+            this.ctx.translate(offsetX, offsetY);
+        }
+
+        // Clear canvas with 1.5x darker rich battlefield earth brown gradient (#1a0f07 -> #120a03 -> #0a0501)
+        const bgGradient = this.ctx.createRadialGradient(w / 2, h / 2, 80, w / 2, h / 2, Math.max(w, h));
+        bgGradient.addColorStop(0, '#1a0f07');   // Rich dark chocolate mud brown
+        bgGradient.addColorStop(0.55, '#120a03'); // Deep dark soil brown
+        bgGradient.addColorStop(1, '#0a0501');    // Darkest pitch wet soil
         this.ctx.fillStyle = bgGradient;
         this.ctx.fillRect(0, 0, w, h);
 
-        // Draw Tactical Grid
-        this.ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)';
-        this.ctx.lineWidth = 1;
-        const gridSize = 60;
-        for (let x = 0; x < w; x += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, h);
-            this.ctx.stroke();
+        // Draw Tank Tread Trails (Vết bánh xích cày rãnh đất chiến trường)
+        if (this.treadTracks) {
+            this.ctx.save();
+            this.ctx.strokeStyle = 'rgba(12, 6, 2, 0.45)';
+            this.ctx.lineWidth = 4;
+            this.ctx.setLineDash([8, 6]);
+            this.treadTracks.forEach(tr => {
+                this.ctx.beginPath();
+                this.ctx.moveTo(tr.x1, tr.y1);
+                this.ctx.lineTo(tr.x2, tr.y2);
+                this.ctx.stroke();
+            });
+            this.ctx.restore();
         }
-        for (let y = 0; y < h; y += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(w, y);
-            this.ctx.stroke();
+
+        // Draw Sandbag Barricades (Bao cát chiến trường)
+        if (this.sandbagBarriers) {
+            this.sandbagBarriers.forEach(sb => {
+                this.ctx.save();
+                this.ctx.translate(sb.x, sb.y);
+                this.ctx.rotate(sb.angle);
+
+                // Draw 3 stacked sandbags
+                this.ctx.fillStyle = '#160d07';
+                this.ctx.strokeStyle = '#0a0502';
+                this.ctx.lineWidth = 1;
+
+                this.ctx.fillRect(-18, -6, 12, 6);
+                this.ctx.strokeRect(-18, -6, 12, 6);
+
+                this.ctx.fillRect(-4, -6, 12, 6);
+                this.ctx.strokeRect(-4, -6, 12, 6);
+
+                this.ctx.fillRect(10, -6, 12, 6);
+                this.ctx.strokeRect(10, -6, 12, 6);
+
+                this.ctx.fillRect(-11, -12, 12, 6);
+                this.ctx.strokeRect(-11, -12, 12, 6);
+
+                this.ctx.fillRect(3, -12, 12, 6);
+                this.ctx.strokeRect(3, -12, 12, 6);
+
+                this.ctx.restore();
+            });
+        }
+
+        // Draw Small Gravel Rocks & Debris
+        if (this.battleRocks) {
+            this.battleRocks.forEach(br => {
+                this.ctx.fillStyle = br.color;
+                this.ctx.beginPath();
+                this.ctx.arc(br.x, br.y, br.r, 0, Math.PI * 2);
+                this.ctx.fill();
+            });
+        }
+
+        // Helper function to draw smooth irregular closed shapes (Bomb craters)
+        const drawIrregularShape = (ctx, pts) => {
+            if (!pts || pts.length === 0) return;
+            ctx.beginPath();
+            const len = pts.length;
+            const p0 = pts[len - 1];
+            const p1 = pts[0];
+            ctx.moveTo((p0.x + p1.x) / 2, (p0.y + p1.y) / 2);
+            for (let i = 0; i < len; i++) {
+                const curr = pts[i];
+                const next = pts[(i + 1) % len];
+                ctx.quadraticCurveTo(curr.x, curr.y, (curr.x + next.x) / 2, (curr.y + next.y) / 2);
+            }
+            ctx.closePath();
+        };
+
+        // Draw Subtle Bomb Craters with Lighter Earthy Rim Lip (Viền hố bom màu nhạt hơn)
+        if (this.craters) {
+            this.craters.forEach(c => {
+                this.ctx.save();
+                this.ctx.translate(c.x, c.y);
+
+                // Dark bomb crater hole gradient
+                const grad = this.ctx.createRadialGradient(0, 0, c.radius * 0.1, 0, 0, c.radius * 1.25);
+                grad.addColorStop(0, 'rgba(6, 3, 1, 0.95)');       // Deep crater center
+                grad.addColorStop(0.5, 'rgba(12, 6, 2, 0.75)');    // Mud inner wall
+                grad.addColorStop(0.85, 'rgba(20, 10, 3, 0.35)');  // Earth outer rim
+                grad.addColorStop(1, 'rgba(18, 9, 3, 0)');        // Blends smoothly into brown soil
+
+                this.ctx.fillStyle = grad;
+                drawIrregularShape(this.ctx, c.outerPoints);
+                this.ctx.fill();
+
+                // Lighter earthy rim stroke (Viền hố bom màu nhạt hơn tự nhiên)
+                this.ctx.strokeStyle = 'rgba(90, 55, 28, 0.55)';
+                this.ctx.lineWidth = 2.2;
+                this.ctx.stroke();
+
+                // Inner crater shadow ring
+                this.ctx.fillStyle = 'rgba(5, 2, 1, 0.7)';
+                drawIrregularShape(this.ctx, c.innerPoints);
+                this.ctx.fill();
+
+                this.ctx.restore();
+            });
+        }
+
+        // Draw Destroyed / Wrecked Tanks (CHÂN THẬT - VẾT NỨT TỰ NHIÊN, KHÓI BỐC & THỦNG GIÁP NỔ CỰC KỲ CHI TIẾT)
+        if (this.wreckedTanks) {
+            this.wreckedTanks.forEach(wt => {
+                this.ctx.save();
+                this.ctx.translate(wt.x, wt.y);
+
+                // Ensure zero neon glow / shadowBlur
+                this.ctx.shadowBlur = 0;
+                this.ctx.shadowColor = 'transparent';
+
+                const isGreen = wt.team === 'green';
+
+                // Darkened 0.5x team colors (Zero Neon, No Border):
+                // Damaged Green (Phe Xanh bên trái): Darkened 0.5x #133545
+                // Damaged Red (Phe Đỏ bên phải): Darkened 0.5x #4d1616
+                const bodyColor = isGreen ? '#133545' : '#4d1616';
+                const trackColor = isGreen ? '#07131a' : '#1a0707';
+
+                // Hull Rotation
+                this.ctx.save();
+                this.ctx.rotate(wt.angle);
+
+                // Tracks (Shortened top track to represent broken track link!)
+                this.ctx.fillStyle = trackColor;
+                this.ctx.fillRect(-22, -20, 36, 8); // Top track blown off at end
+                this.ctx.fillRect(-22, 12, 44, 8);  // Bottom track
+
+                // Broken track tread piece hanging off rear (Mảnh xích đứt văng)
+                this.ctx.save();
+                this.ctx.translate(-24, -18);
+                this.ctx.rotate(0.35);
+                this.ctx.fillRect(0, 0, 9, 7);
+                this.ctx.restore();
+
+                // Main Body (-18, -13, 36, 26 - NO STROKE BORDER AT ALL!)
+                this.ctx.fillStyle = bodyColor;
+                this.ctx.fillRect(-18, -13, 36, 26);
+
+                // Heavy Internal burn overlay fill
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+                this.ctx.fillRect(-15, -10, 30, 20);
+
+                // Shell Breach Core (Vết đạn pháo đâm nổ xuyên giáp nổ ngầm)
+                const breachGrad = this.ctx.createRadialGradient(-3, -1, 1, -3, -1, 7);
+                breachGrad.addColorStop(0, 'rgba(234, 88, 12, 0.4)'); // Low heat ember core
+                breachGrad.addColorStop(0.45, 'rgba(8, 4, 1, 0.95)');
+                breachGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                this.ctx.fillStyle = breachGrad;
+                this.ctx.beginPath();
+                this.ctx.arc(-3, -1, 7.5, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Realistic Organic Spiderweb Armor Cracks (Các vết nứt rải rác tự nhiên chân thật)
+                this.ctx.strokeStyle = '#020101';
+                this.ctx.lineWidth = 1.6;
+                this.ctx.beginPath();
+                // Radial cracks spreading from shell breach point (-3, -1)
+                this.ctx.moveTo(-3, -1); this.ctx.lineTo(-9, -6); this.ctx.lineTo(-16, -4);
+                this.ctx.moveTo(-3, -1); this.ctx.lineTo(-7, 6); this.ctx.lineTo(-13, 10);
+                this.ctx.moveTo(-3, -1); this.ctx.lineTo(4, -5); this.ctx.lineTo(12, -8);
+                this.ctx.moveTo(-3, -1); this.ctx.lineTo(5, 5); this.ctx.lineTo(14, 3);
+                // Secondary branching sub-cracks (Vết nứt phụ nhánh)
+                this.ctx.moveTo(-9, -6); this.ctx.lineTo(-6, -11);
+                this.ctx.moveTo(4, -5); this.ctx.lineTo(2, -10);
+                this.ctx.moveTo(5, 5); this.ctx.lineTo(8, 9);
+                this.ctx.moveTo(-7, 6); this.ctx.lineTo(-4, 11);
+                this.ctx.stroke();
+
+                this.ctx.restore(); // end hull
+
+                // Turret Rotation (Centered on body)
+                this.ctx.save();
+                this.ctx.rotate(wt.turretAngle);
+
+                // Cannon Barrel (Identical size 0, -4, 28, 8 - NO STROKE BORDER!)
+                this.ctx.fillStyle = bodyColor;
+                this.ctx.fillRect(0, -4, 28, 8);
+
+                // Cannon Barrel crack/burnt tip
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+                this.ctx.fillRect(18, -4, 10, 8);
+
+                // Turret Dome (Identical size arc radius 11 - NO STROKE BORDER, NO WHITE NEON!)
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, 11, 0, Math.PI * 2);
+                this.ctx.fillStyle = bodyColor;
+                this.ctx.fill();
+
+                // Realistic Turret Dome Fracture Cracks
+                this.ctx.strokeStyle = '#020101';
+                this.ctx.lineWidth = 1.5;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, 0); this.ctx.lineTo(-7, -7);
+                this.ctx.moveTo(0, 0); this.ctx.lineTo(6, -6);
+                this.ctx.moveTo(0, 0); this.ctx.lineTo(3, 8);
+                this.ctx.stroke();
+
+                this.ctx.restore(); // end turret
+                this.ctx.restore(); // end wt translate
+            });
         }
 
         // Draw Radar in Top Right
@@ -684,22 +1080,35 @@ class HomepageEngine {
             this.ctx.restore();
         });
 
-        // Draw Particles (Smoke, Heavy Smoke & Fire)
+        // Draw Particles (Smoke, Heavy Smoke, Slow Smoke, Fire, Title Flame & Sparks - Ultra Fast Zero-CPU Blur)
         this.particles.forEach(p => {
-            if (p.type === 'smoke' || p.type === 'fire' || p.type === 'heavy_smoke') {
+            if (p.type === 'smoke' || p.type === 'fire' || p.type === 'heavy_smoke' || p.type === 'slow_smoke' || p.type === 'title_fire' || p.type === 'title_spark') {
                 this.ctx.save();
-                this.ctx.globalAlpha = Math.max(0, p.alpha);
                 this.ctx.fillStyle = p.color;
-                if (p.type === 'heavy_smoke') {
-                    this.ctx.shadowColor = p.color;
-                    this.ctx.shadowBlur = 10;
+
+                if (p.type === 'title_fire' || p.type === 'title_spark') {
+                    // Soft outer halo glow (Zero shadowBlur CPU penalty!)
+                    this.ctx.globalAlpha = Math.max(0, p.alpha * 0.35);
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.radius * 1.8, 0, Math.PI * 2);
+                    this.ctx.fill();
                 }
+
+                // Core fill
+                this.ctx.globalAlpha = Math.max(0, p.alpha);
                 this.ctx.beginPath();
                 this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
                 this.ctx.fill();
                 this.ctx.restore();
             }
         });
+
+        // Draw Easter Egg elements (Super Tanks, Fallen Letters, Mechanical Repairmen)
+        this.drawSuperTanks();
+        this.drawFallenLetters();
+        this.drawRepairmen();
+
+        this.ctx.restore(); // end screenShake translate
     }
 
     bindEvents() {
@@ -712,7 +1121,7 @@ class HomepageEngine {
             if (typeof audio !== 'undefined') {
                 audio.init();
                 if (audio.ctx && audio.ctx.state === 'suspended') {
-                    audio.ctx.resume().catch(() => {});
+                    audio.ctx.resume().catch(() => { });
                 }
             }
         };
@@ -908,38 +1317,38 @@ class HomepageEngine {
         const h = this.canvas ? this.canvas.height : window.innerHeight;
         const now = Date.now();
 
-        // Continuous smoke plumes rising from damaged title letters "XE" and "TĂNG"
+        // Continuous smoke plumes rising straight UP from damaged title letters "XE" and "TĂNG" (Bốc khói siêu chậm rãi)
         if (this.titleDamagedXe) {
             const titleXe = document.querySelector('.title-xe');
-            if (titleXe && Math.random() < 0.7) {
+            if (titleXe && Math.random() < 0.15) {
                 const r = titleXe.getBoundingClientRect();
                 this.particles.push({
                     type: 'heavy_smoke',
                     x: r.left + Math.random() * r.width,
                     y: r.top + r.height,
-                    vx: (Math.random() - 0.5) * 1.5,
-                    vy: -Math.random() * 2.5 - 1,
-                    radius: Math.random() * 10 + 6,
+                    vx: (Math.random() - 0.5) * 0.08,
+                    vy: -Math.random() * 0.12 - 0.06,  // Ultra-slow rising speed
+                    radius: Math.random() * 10 + 5,
                     color: Math.random() > 0.4 ? '#334155' : '#0f172a',
-                    alpha: 0.85,
-                    decay: 0.018
+                    alpha: 0.75,
+                    decay: 0.004
                 });
             }
         }
         if (this.titleDamagedTang) {
             const titleTang = document.querySelector('.title-tang');
-            if (titleTang && Math.random() < 0.7) {
+            if (titleTang && Math.random() < 0.15) {
                 const r = titleTang.getBoundingClientRect();
                 this.particles.push({
                     type: 'heavy_smoke',
                     x: r.left + Math.random() * r.width,
                     y: r.top + r.height,
-                    vx: (Math.random() - 0.5) * 1.5,
-                    vy: -Math.random() * 2.5 - 1,
-                    radius: Math.random() * 10 + 6,
+                    vx: (Math.random() - 0.5) * 0.08,
+                    vy: -Math.random() * 0.12 - 0.06,  // Ultra-slow rising speed
+                    radius: Math.random() * 10 + 5,
                     color: Math.random() > 0.4 ? '#475569' : '#0f172a',
-                    alpha: 0.85,
-                    decay: 0.018
+                    alpha: 0.75,
+                    decay: 0.004
                 });
             }
         }
@@ -1106,118 +1515,286 @@ class HomepageEngine {
             }
         }
 
-        // 5. REPAIRMEN_ENTERING (Prominent military mechanics run out from edges with scaffolding)
-        else if (this.idleSeqState === 'REPAIRMEN_ENTERING') {
-            let allArrived = true;
-            this.repairmen.forEach(rm => {
-                const dx = rm.targetX - rm.x;
-                if (Math.abs(dx) > 6) {
-                    rm.x += Math.sign(dx) * 4.5;
-                    rm.animFrame += 0.25;
-                    allArrived = false;
+        // 5. REPAIRMEN_ENTERING, REPAIRING, CURSING & EXITING (Independent per-repairman state machine!)
+        else if (this.idleSeqState === 'REPAIRMEN_ENTERING' || this.idleSeqState === 'REPAIRING' || this.idleSeqState === 'CURSING' || this.idleSeqState === 'REPAIRMEN_EXITING') {
+            this.idleSeqState = 'REPAIRING';
+            let allDone = true;
 
-                    // Footsteps running sound
-                    if (Math.random() < 0.25 && typeof audio !== 'undefined') {
-                        audio.playRepairmenFootsteps();
-                    }
-                } else {
-                    rm.x = rm.targetX;
-                }
-            });
-
-            if (allArrived) {
-                this.idleSeqState = 'REPAIRING';
-                this.idleSeqTimer = 0;
-            }
-        }
-
-        // 6. REPAIRING (Mechanics weld & hammer with plasma sparks & welding smoke)
-        else if (this.idleSeqState === 'REPAIRING') {
-            this.repairmen.forEach(rm => {
-                rm.workFrame += 0.3;
-
-                // Welding plasma sizzle sound & hammer clink sound
-                if (Math.random() < 0.35 && typeof audio !== 'undefined') {
-                    audio.playWeldingSizzle();
-                }
-                if (Math.random() < 0.15 && typeof audio !== 'undefined') {
-                    audio.playHammerHit();
+            this.repairmen.forEach((rm, index) => {
+                // NaN state recovery safeguard
+                if (isNaN(rm.x) || isNaN(rm.y)) {
+                    rm.x = rm.homeGroundX || w * 0.5;
+                    rm.y = rm.groundY || 300;
                 }
 
-                // Welding spark & plasma arc smoke particles!
-                if (Math.random() < 0.85) {
-                    this.particles.push({
-                        type: 'fire',
-                        x: rm.x + (Math.random() - 0.5) * 25,
-                        y: rm.y - 65 + (Math.random() - 0.5) * 20,
-                        vx: (Math.random() - 0.5) * 9,
-                        vy: (Math.random() - 0.5) * 9 - 3,
-                        radius: Math.random() * 5 + 2,
-                        color: Math.random() > 0.4 ? '#38bdf8' : '#facc15',
-                        alpha: 1.0,
-                        decay: 0.08
-                    });
+                const currentLetter = (rm.assignedLetters && rm.letterIndex < rm.assignedLetters.length) ? rm.assignedLetters[rm.letterIndex] : null;
 
-                    // Soft white welding smoke
-                    this.particles.push({
-                        type: 'heavy_smoke',
-                        x: rm.x + (Math.random() - 0.5) * 15,
-                        y: rm.y - 70,
-                        vx: (Math.random() - 0.5) * 1,
-                        vy: -Math.random() * 2 - 1,
-                        radius: Math.random() * 6 + 3,
-                        color: '#e2e8f0',
-                        alpha: 0.7,
-                        decay: 0.03
-                    });
-                }
-            });
+                if (rm.state === 'RUNNING_TO_GROUND') {
+                    allDone = false;
+                    const targetX = currentLetter ? currentLetter.groundX : rm.x;
+                    const dx = targetX - rm.x;
 
-            if (this.idleSeqTimer > 2.2 && !this.titleRepaired) {
-                this.titleRepaired = true;
-                this.repairTitle();
-            }
-
-            if (this.idleSeqTimer > 3.2) {
-                this.idleSeqState = 'CURSING';
-                this.idleSeqTimer = 0;
-                this.showSpeechBubbles();
-            }
-        }
-
-        // 7. CURSING (Show speech bubbles "#@!$%" above repairmen)
-        else if (this.idleSeqState === 'CURSING') {
-            if (this.idleSeqTimer > 3.0) {
-                this.removeSpeechBubbles();
-                this.idleSeqState = 'REPAIRMEN_EXITING';
-                this.idleSeqTimer = 0;
-                // Set repairmen to run off-screen
-                if (this.repairmen[0]) this.repairmen[0].targetX = -150;
-                if (this.repairmen[1]) this.repairmen[1].targetX = w + 150;
-            }
-        }
-
-        // 8. REPAIRMEN_EXITING (Repairmen run off-screen and reset)
-        else if (this.idleSeqState === 'REPAIRMEN_EXITING') {
-            let allExited = true;
-            this.repairmen.forEach(rm => {
-                const dx = rm.targetX - rm.x;
-                if (Math.abs(dx) > 10) {
-                    rm.x += Math.sign(dx) * 5.2;
-                    rm.animFrame += 0.3;
-                    allExited = false;
-
-                    // Footsteps running sound while exiting
-                    if (Math.random() < 0.25 && typeof audio !== 'undefined') {
-                        audio.playRepairmenFootsteps();
+                    if (Math.abs(dx) > 4) {
+                        rm.x += Math.sign(dx) * Math.min(Math.abs(dx), 7.0);
+                        rm.animFrame += 0.5;
+                        if (Math.random() < 0.25 && typeof audio !== 'undefined') audio.playRepairmenFootsteps();
+                    } else {
+                        rm.x = targetX;
+                        rm.y = rm.groundY;
+                        rm.state = 'PICKING_UP';
+                        rm.workTimer = 0;
                     }
                 }
+                else if (rm.state === 'PICKING_UP') {
+                    allDone = false;
+                    rm.workTimer = (rm.workTimer || 0) + dt;
+                    rm.workFrame += 0.4;
+                    // Bends down & grabs letter
+                    if (rm.workTimer > 0.2) {
+                        rm.holdingLetter = currentLetter;
+                        if (currentLetter) {
+                            currentLetter.falling = false; // Stop falling physics immediately so drawFallenLetters does not fight!
+                        }
+                        rm.state = 'CARRYING_UP';
+                        rm.workTimer = 0;
+                    }
+                }
+                else if (rm.state === 'CARRYING_UP') {
+                    allDone = false;
+                    const targetX = currentLetter ? currentLetter.homeX : rm.x;
+                    const targetY = currentLetter ? (currentLetter.homeY + 38) : (rm.groundY - 40);
+                    const dx = targetX - rm.x;
+                    const dy = targetY - rm.y;
+                    const dist = Math.hypot(dx, dy);
+
+                    if (dist > 6) {
+                        const safeDist = dist > 0.001 ? dist : 1;
+                        const step = Math.min(dist, 7.5);
+                        rm.x += (dx / safeDist) * step;
+                        rm.y += (dy / safeDist) * step;
+                        if (currentLetter) {
+                            currentLetter.currentX = rm.x + (rm.team === 'green' ? 12 : -12);
+                            currentLetter.currentY = rm.y - 32; // Torso level right in hands!
+                            currentLetter.currentRotation = (currentLetter.rotation || 0) * (dist / 120);
+                        }
+                        rm.animFrame += 0.5;
+                    } else {
+                        rm.x = targetX;
+                        rm.y = targetY;
+                        rm.state = 'PLACING_LETTER';
+                        rm.workTimer = 0;
+                    }
+                }
+                else if (rm.state === 'PLACING_LETTER') {
+                    allDone = false;
+                    rm.workTimer = (rm.workTimer || 0) + dt;
+                    if (currentLetter) {
+                        currentLetter.currentX = currentLetter.homeX;
+                        currentLetter.currentY = currentLetter.homeY;
+                        currentLetter.currentRotation = 0;
+                    }
+                    if (rm.workTimer > 0.2) {
+                        rm.state = 'WELDING';
+                        rm.workTimer = 0;
+                    }
+                }
+                else if (rm.state === 'WELDING') {
+                    allDone = false;
+                    rm.workTimer = (rm.workTimer || 0) + dt;
+                    rm.workFrame += 0.4;
+
+                    if (currentLetter) {
+                        currentLetter.currentX = currentLetter.homeX;
+                        currentLetter.currentY = currentLetter.homeY;
+                        currentLetter.currentRotation = 0;
+                    }
+
+                    // Mechanical plasma welder sizzle sound & sparks
+                    if (Math.random() < 0.4 && typeof audio !== 'undefined') audio.playWeldingSizzle();
+
+                    if (Math.random() < 0.95) {
+                        this.particles.push({
+                            type: 'fire',
+                            x: rm.x + (Math.random() - 0.5) * 16,
+                            y: rm.y - 35 + (Math.random() - 0.5) * 10,
+                            vx: (Math.random() - 0.5) * 7,
+                            vy: (Math.random() - 0.5) * 7 - 2,
+                            radius: Math.random() * 4 + 2,
+                            color: Math.random() > 0.4 ? (rm.team === 'green' ? '#38bdf8' : '#ef4444') : '#facc15',
+                            alpha: 1.0,
+                            decay: 0.07
+                        });
+                    }
+
+                    // Crisp 0.45s welding duration
+                    if (rm.workTimer > 0.45) {
+                        // Letter is welded!
+                        if (currentLetter) {
+                            currentLetter.repaired = true;
+                            currentLetter.falling = false;
+                            currentLetter.currentX = currentLetter.homeX;
+                            currentLetter.currentY = currentLetter.homeY;
+                            currentLetter.currentRotation = 0;
+                            if (typeof audio !== 'undefined') audio.playTitleRepairedChime();
+                        }
+                        rm.holdingLetter = null;
+                        rm.letterIndex++;
+
+                        rm.state = 'RETURNING_TO_GROUND';
+                    }
+                }
+                else if (rm.state === 'RETURNING_TO_GROUND') {
+                    allDone = false;
+                    const dy = rm.groundY - rm.y;
+                    if (Math.abs(dy) > 4) {
+                        rm.y += Math.sign(dy) * Math.min(Math.abs(dy), 7.5); // Smooth constant ground landing
+                    } else {
+                        rm.y = rm.groundY;
+                        if (rm.assignedLetters && rm.letterIndex < rm.assignedLetters.length) {
+                            rm.state = 'RUNNING_TO_GROUND';
+                        } else {
+                            // All team letters done! Stand on ground below last repaired letter & curse!
+                            rm.state = 'CURSING';
+                            rm.curseTimer = 0;
+                            this.showSingleSpeechBubble(rm, index);
+                        }
+                    }
+                }
+                else if (rm.state === 'CURSING') {
+                    allDone = false;
+                    rm.curseTimer = (rm.curseTimer || 0) + dt;
+                    rm.curseFrame = (rm.curseFrame || 0) + 0.25;
+                    rm.y = rm.groundY; // Keep strictly at ground position under title word!
+
+                    // Update speech bubble position dynamically as repairman curses
+                    const bubble = document.getElementById(`repairman-bubble-${index}`);
+                    if (bubble) {
+                        bubble.style.left = `${rm.x + (index === 0 ? 7 : -7)}px`;
+                        bubble.style.top = `${rm.y - 116}px`;
+                    }
+
+                    // Angry red steam puffs popping from head
+                    if (Math.random() < 0.15) {
+                        this.particles.push({
+                            type: 'heavy_smoke',
+                            x: rm.x + (Math.random() - 0.5) * 8,
+                            y: rm.y - 50,
+                            vx: (Math.random() - 0.5) * 1.5,
+                            vy: -Math.random() * 2 - 1,
+                            radius: Math.random() * 4 + 2,
+                            color: '#ef4444',
+                            alpha: 0.8,
+                            decay: 0.04
+                        });
+                    }
+
+                    if (rm.curseTimer > 2.2) {
+                        this.removeSingleSpeechBubble(index);
+                        rm.state = 'EXITING';
+                        rm.targetX = rm.team === 'green' ? -150 : w + 150;
+                    }
+                }
+                else if (rm.state === 'EXITING') {
+                    allDone = false;
+                    const dx = rm.targetX - rm.x;
+                    if (Math.abs(dx) > 6) {
+                        rm.x += Math.sign(dx) * Math.min(Math.abs(dx), 8.5); // 1.5x speed boost for exit running!
+                        rm.animFrame += 0.5;
+                        if (Math.random() < 0.25 && typeof audio !== 'undefined') audio.playRepairmenFootsteps();
+                    } else {
+                        rm.x = rm.targetX;
+                        rm.state = 'DONE';
+                    }
+                }
+                else if (rm.state === 'DONE') {
+                    // Finished
+                }
             });
 
-            if (allExited) {
-                this.stopIdleEasterEgg();
+            if (allDone) {
+                this.idleSeqState = 'WAITING_FOR_IGNITION';
+                this.ignitionTimer = 0;
             }
         }
+        else if (this.idleSeqState === 'WAITING_FOR_IGNITION') {
+            this.ignitionTimer = (this.ignitionTimer || 0) + dt;
+
+            // Exactly 2.0 Seconds Delay After Both Repairmen Leave Off-Screen per user directive!
+            if (this.ignitionTimer > 2.0) {
+                this.idleSeqState = 'RE_IGNITING';
+                this.reigniteTitleWithFireBurst();
+            }
+        }
+    }
+
+    reigniteTitleWithFireBurst() {
+        const titleXe = document.querySelector('.title-xe');
+        const titleTang = document.querySelector('.title-tang');
+
+        // 1. Clear canvas fallen letters so HTML spans take seamless control!
+        this.fallenLetters = [];
+
+        // 2. Remove char-hidden and restore char-repaired on all letter spans
+        const charEls = document.querySelectorAll('.char-l');
+        charEls.forEach(el => {
+            el.classList.remove('char-hidden', 'char-welded-gray', 'char-ignite-burst');
+            el.classList.add('char-repaired');
+        });
+
+        // 3. Add title-igniting to title containers for 1.5s upward fire sweep animation
+        if (titleXe) titleXe.classList.add('title-igniting');
+        if (titleTang) titleTang.classList.add('title-igniting');
+
+        // 4. Play dramatic ignition chime sound & explosion
+        if (typeof audio !== 'undefined') {
+            audio.playTitleRepairedChime();
+            audio.playExplosion();
+        }
+
+        // 4. Emit 140 RISING fire particles sweeping upwards off top of screen!
+        const rectXe = titleXe?.getBoundingClientRect();
+        const rectTang = titleTang?.getBoundingClientRect();
+
+        // Green/Blue Fire Wave for XE (sweeps upwards off top of screen!)
+        if (rectXe) {
+            for (let i = 0; i < 70; i++) {
+                this.particles.push({
+                    type: 'fire',
+                    x: rectXe.left + Math.random() * rectXe.width,
+                    y: rectXe.top + Math.random() * rectXe.height,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: -Math.random() * 7 - 4, // Strong upward velocity sweeping off top of screen!
+                    radius: Math.random() * 9 + 4,
+                    color: Math.random() > 0.4 ? '#38bdf8' : (Math.random() > 0.5 ? '#22c55e' : '#4ade80'),
+                    alpha: 1.0,
+                    decay: 0.022 // Long-lived particles that rise all the way off top screen!
+                });
+            }
+        }
+
+        // Red/Orange Fire Wave for TĂNG (sweeps upwards off top of screen!)
+        if (rectTang) {
+            for (let i = 0; i < 70; i++) {
+                this.particles.push({
+                    type: 'fire',
+                    x: rectTang.left + Math.random() * rectTang.width,
+                    y: rectTang.top + Math.random() * rectTang.height,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: -Math.random() * 7 - 4, // Strong upward velocity sweeping off top of screen!
+                    radius: Math.random() * 9 + 4,
+                    color: Math.random() > 0.4 ? '#ef4444' : (Math.random() > 0.5 ? '#ff4d4d' : '#facc15'),
+                    alpha: 1.0,
+                    decay: 0.022 // Long-lived particles that rise all the way off top screen!
+                });
+            }
+        }
+
+        // Sequence Complete! Remove title-igniting after 1.5s so 60 FPS keyframe animations take over
+        setTimeout(() => {
+            if (titleXe) titleXe.classList.remove('title-igniting');
+            if (titleTang) titleTang.classList.remove('title-igniting');
+            this.stopIdleEasterEgg();
+        }, 1500);
     }
 
     startIdleEasterEgg() {
@@ -1326,27 +1903,122 @@ class HomepageEngine {
     damageTitle(targetType) {
         const titleXe = document.querySelector('.title-xe');
         const titleTang = document.querySelector('.title-tang');
+        const w = this.canvas ? this.canvas.width : window.innerWidth;
+
+        // Screen Shake impact when title is hit!
+        this.screenShake = 22;
 
         // Play metallic title knockdown crash impact sound FX
         if (typeof audio !== 'undefined') {
             audio.playTitleCrash();
         }
 
+        const rectXe = titleXe ? titleXe.getBoundingClientRect() : { left: w * 0.44, top: 120, width: 80, height: 60 };
+        const rectTang = titleTang ? titleTang.getBoundingClientRect() : { left: w * 0.56, top: 120, width: 120, height: 60 };
+        // Set groundY well below the title header (+85) so repairmen stand WELL BELOW title text!
+        const groundY = (rectXe.bottom || (rectXe.top + 60)) + 85;
+
+        if (!this.fallenLetters) this.fallenLetters = [];
+
         if (targetType === 'xe' || !targetType) {
-            if (titleXe) titleXe.classList.add('title-broken-xe');
             this.titleDamagedXe = true;
+            document.querySelectorAll('.title-xe .char-l').forEach(el => {
+                el.classList.add('char-hidden');
+                el.classList.remove('char-repaired', 'char-ignite-burst');
+            });
+
             if (titleXe) {
-                const r = titleXe.getBoundingClientRect();
-                this.createHeavyExplosion(r.left + r.width / 2, r.top + r.height / 2, '#38bdf8');
+                titleXe.classList.add('title-unlit');
+                titleXe.classList.remove('title-igniting');
+                this.createHeavyExplosion(rectXe.left + rectXe.width / 2, rectXe.top + rectXe.height / 2, '#38bdf8');
             }
+
+            const homeY = rectXe.top + rectXe.height / 2;
+            const widthPerChar = rectXe.width / 2;
+
+            // Scatter ground positions with ZERO overlap between letters
+            const gX1 = rectXe.left - 20 + (Math.random() - 0.5) * 15;
+            const gX2 = rectXe.left + widthPerChar * 1.6 + (Math.random() - 0.5) * 15;
+
+            const rot1 = (Math.random() - 0.5) * Math.PI * 1.5;
+            const rot2 = (Math.random() - 0.5) * Math.PI * 1.5;
+
+            this.fallenLetters.push({
+                id: 'xe_X',
+                team: 'green',
+                char: 'X',
+                homeX: rectXe.left + widthPerChar * 0.45,
+                homeY: homeY,
+                currentX: rectXe.left + widthPerChar * 0.45,
+                currentY: homeY,
+                groundX: gX1,
+                groundY: groundY + (Math.random() - 0.5) * 12,
+                rotation: rot1,
+                currentRotation: rot1,
+                repaired: false,
+                falling: true
+            });
+
+            this.fallenLetters.push({
+                id: 'xe_E',
+                team: 'green',
+                char: 'E',
+                homeX: rectXe.left + widthPerChar * 1.55,
+                homeY: homeY,
+                currentX: rectXe.left + widthPerChar * 1.55,
+                currentY: homeY,
+                groundX: gX2,
+                groundY: groundY + (Math.random() - 0.5) * 12,
+                rotation: rot2,
+                currentRotation: rot2,
+                repaired: false,
+                falling: true
+            });
         }
+
         if (targetType === 'tang' || !targetType) {
-            if (titleTang) titleTang.classList.add('title-broken-tang');
             this.titleDamagedTang = true;
+            document.querySelectorAll('.title-tang .char-l').forEach(el => {
+                el.classList.add('char-hidden');
+                el.classList.remove('char-repaired', 'char-ignite-burst');
+            });
+
             if (titleTang) {
-                const r = titleTang.getBoundingClientRect();
-                this.createHeavyExplosion(r.left + r.width / 2, r.top + r.height / 2, '#ef4444');
+                titleTang.classList.add('title-unlit');
+                titleTang.classList.remove('title-igniting');
+                this.createHeavyExplosion(rectTang.left + rectTang.width / 2, rectTang.top + rectTang.height / 2, '#ef4444');
             }
+
+            const homeY = rectTang.top + rectTang.height / 2;
+            const widthPerChar = rectTang.width / 4;
+            const chars = ['T', 'Ă', 'N', 'G'];
+
+            // Scatter 4 letters naturally across ground with zero overlap
+            const baseStartX = rectTang.left - 30;
+            const stepX = (rectTang.width + 60) / 3.5;
+
+            chars.forEach((ch, idx) => {
+                const gX = baseStartX + idx * stepX + (Math.random() - 0.5) * 12;
+                // Specific wild rotations (e.g. Ă upside down 180 deg, T tilted sideways)
+                let rot = (Math.random() - 0.5) * Math.PI * 1.6;
+                if (ch === 'Ă') rot = Math.PI + (Math.random() - 0.5) * 0.4;
+
+                this.fallenLetters.push({
+                    id: `tang_${ch}_${idx}`,
+                    team: 'red',
+                    char: ch,
+                    homeX: rectTang.left + widthPerChar * (idx + 0.5),
+                    homeY: homeY,
+                    currentX: rectTang.left + widthPerChar * (idx + 0.5),
+                    currentY: homeY,
+                    groundX: gX,
+                    groundY: groundY + (Math.random() - 0.5) * 14,
+                    rotation: rot,
+                    currentRotation: rot,
+                    repaired: false,
+                    falling: true
+                });
+            });
         }
     }
 
@@ -1355,10 +2027,14 @@ class HomepageEngine {
         const titleXe = document.querySelector('.title-xe');
         const titleTang = document.querySelector('.title-tang');
 
-        const rectXe = titleXe ? titleXe.getBoundingClientRect() : { left: w * 0.44, top: 150, width: 80 };
-        const rectTang = titleTang ? titleTang.getBoundingClientRect() : { left: w * 0.56, top: 150, width: 120 };
+        const rectXe = titleXe ? titleXe.getBoundingClientRect() : { left: w * 0.44, top: 120, width: 80, height: 60 };
+        const rectTang = titleTang ? titleTang.getBoundingClientRect() : { left: w * 0.56, top: 120, width: 120, height: 60 };
 
-        const groundY = rectXe.top + 100;
+        // Ground level is well below title text (+85)
+        const groundY = (rectXe.bottom || (rectXe.top + 60)) + 85;
+
+        const greenLetters = (this.fallenLetters || []).filter(l => l.team === 'green');
+        const redLetters = (this.fallenLetters || []).filter(l => l.team === 'red');
 
         this.repairmen = [
             {
@@ -1366,96 +2042,117 @@ class HomepageEngine {
                 team: 'green',
                 x: -100,
                 y: groundY,
-                targetX: rectXe.left + (rectXe.width / 2),
+                groundY: groundY,
+                homeGroundX: rectXe.left + (rectXe.width / 2),
+                state: 'RUNNING_TO_GROUND',
                 animFrame: 0,
-                workFrame: 0
+                workFrame: 0,
+                curseFrame: 0,
+                curseTimer: 0,
+                assignedLetters: greenLetters,
+                letterIndex: 0,
+                holdingLetter: null
             },
             {
                 id: 'rep-2',
                 team: 'red',
                 x: w + 100,
                 y: groundY,
-                targetX: rectTang.left + (rectTang.width / 2),
+                groundY: groundY,
+                homeGroundX: rectTang.left + (rectTang.width / 2),
+                state: 'RUNNING_TO_GROUND',
                 animFrame: 0,
-                workFrame: 0
+                workFrame: 0,
+                curseFrame: 0,
+                curseTimer: 0,
+                assignedLetters: redLetters,
+                letterIndex: 0,
+                holdingLetter: null
             }
         ];
     }
 
-    repairTitle() {
-        const titleXe = document.querySelector('.title-xe');
-        const titleTang = document.querySelector('.title-tang');
+    drawFallenLetters() {
+        if (!this.fallenLetters || this.fallenLetters.length === 0) return;
 
-        this.titleDamagedXe = false;
-        this.titleDamagedTang = false;
+        const titleEl = document.querySelector('.main-title') || document.querySelector('.title-xe');
+        const fontSizePx = titleEl ? parseFloat(window.getComputedStyle(titleEl).fontSize) : 83;
 
-        // Play triumphant repair victory chime sound FX!
-        if (typeof audio !== 'undefined') {
-            audio.playTitleRepairedChime();
-        }
+        this.ctx.save();
+        this.ctx.font = `900 ${fontSizePx}px "Be Vietnam Pro", "Montserrat", sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
 
-        if (titleXe) {
-            titleXe.classList.remove('title-broken-xe');
-            titleXe.classList.add('title-repaired-bounce');
-        }
-        if (titleTang) {
-            titleTang.classList.remove('title-broken-tang');
-            titleTang.classList.add('title-repaired-bounce');
-        }
-
-        // Burst of clean cyan/gold repair smoke particles around title
-        const titleEl = document.querySelector('.main-title');
-        if (titleEl) {
-            const r = titleEl.getBoundingClientRect();
-            for (let i = 0; i < 25; i++) {
-                this.particles.push({
-                    type: 'heavy_smoke',
-                    x: r.left + Math.random() * r.width,
-                    y: r.top + Math.random() * r.height,
-                    vx: (Math.random() - 0.5) * 3,
-                    vy: (Math.random() - 0.5) * 3 - 1,
-                    radius: Math.random() * 10 + 5,
-                    color: Math.random() > 0.5 ? '#38bdf8' : '#facc15',
-                    alpha: 0.8,
-                    decay: 0.03
-                });
+        this.fallenLetters.forEach(l => {
+            // Smooth falling physics from title to ground
+            if (l.falling) {
+                l.currentY += (l.groundY - l.currentY) * 0.12;
+                l.currentX += (l.groundX - l.currentX) * 0.12;
+                if (Math.abs(l.currentY - l.groundY) < 1.5) {
+                    l.currentY = l.groundY;
+                    l.currentX = l.groundX;
+                    l.falling = false;
+                }
             }
-        }
 
-        setTimeout(() => {
-            if (titleXe) titleXe.classList.remove('title-repaired-bounce');
-            if (titleTang) titleTang.classList.remove('title-repaired-bounce');
-        }, 800);
+            this.ctx.save();
+            this.ctx.translate(l.currentX, l.currentY);
+            this.ctx.rotate(l.currentRotation || 0);
+
+            // Burnt dark charcoal letter styling with exact font & layout
+            this.ctx.fillStyle = '#475569';
+            this.ctx.strokeStyle = 'rgba(15, 23, 42, 0.9)';
+            this.ctx.lineWidth = 1.5;
+            this.ctx.fillText(l.char, 0, 0);
+            this.ctx.strokeText(l.char, 0, 0);
+
+            this.ctx.restore();
+        });
+
+        this.ctx.restore();
     }
 
-    showSpeechBubbles() {
-        this.removeSpeechBubbles();
+    showSingleSpeechBubble(rm, index) {
+        if (typeof audio !== 'undefined') audio.playPopBubble();
 
-        // Play comic speech bubble pop sound FX!
-        if (typeof audio !== 'undefined') {
-            audio.playPopBubble();
+        const isLeft = (index === 0);
+        let bubble = document.getElementById(`repairman-bubble-${index}`);
+        if (!bubble) {
+            bubble = document.createElement('div');
+            bubble.className = `repairman-bubble ${isLeft ? 'bubble-left' : 'bubble-right'}`;
+            bubble.id = `repairman-bubble-${index}`;
+            document.body.appendChild(bubble);
+        }
+        bubble.innerText = isLeft ? " !@$%" : "#@!#%";
+
+        if (isLeft) {
+            bubble.style.left = `${rm.x + 7}px`;
+            bubble.style.top = `${rm.y - 116}px`;
+        } else {
+            bubble.style.left = `${rm.x - 7}px`;
+            bubble.style.top = `${rm.y - 116}px`;
         }
 
-        this.repairmen.forEach((rm, index) => {
-            const bubble = document.createElement('div');
-            bubble.className = 'repairman-bubble';
-            bubble.id = `repairman-bubble-${index}`;
-            bubble.innerText = index === 0 
-                ? "🔧 Trời ơi! Sếp lái kiểu gì bắn rụng rốn chữ XE rồi! 💥" 
-                : "⚡ Chữ TĂNG nát bét! Tụi tui hàn lại đẹp hơn mới! 🛠️";
+        if (!this.bubbles) this.bubbles = [];
+        if (!this.bubbles.includes(bubble)) this.bubbles.push(bubble);
+    }
 
-            bubble.style.left = `${rm.x - 110}px`;
-            bubble.style.top = `${rm.y - 120}px`;
-
-            document.body.appendChild(bubble);
-            this.bubbles.push(bubble);
-        });
+    removeSingleSpeechBubble(index) {
+        const bubble = document.getElementById(`repairman-bubble-${index}`);
+        if (bubble && bubble.parentNode) {
+            bubble.parentNode.removeChild(bubble);
+        }
+        if (this.bubbles) {
+            this.bubbles = this.bubbles.filter(b => b.id !== `repairman-bubble-${index}`);
+        }
     }
 
     removeSpeechBubbles() {
-        this.bubbles.forEach(b => {
-            if (b && b.parentNode) b.parentNode.removeChild(b);
-        });
+        if (this.bubbles) {
+            this.bubbles.forEach(b => {
+                if (b && b.parentNode) b.parentNode.removeChild(b);
+            });
+        }
         this.bubbles = [];
     }
 
@@ -1465,6 +2162,7 @@ class HomepageEngine {
         this.superTanks = [];
         this.repairmen = [];
         this.idleBullets = [];
+        this.fallenLetters = [];
         this.titleDamagedXe = false;
         this.titleDamagedTang = false;
         this.firedGreen = false;
@@ -1473,13 +2171,17 @@ class HomepageEngine {
         this.lastActivityTime = Date.now();
         this.removeSpeechBubbles();
 
+        document.querySelectorAll('.char-l').forEach(el => {
+            el.classList.remove('char-hidden', 'char-ignite-burst');
+        });
+
         const titleXe = document.querySelector('.title-xe');
         const titleTang = document.querySelector('.title-tang');
         if (titleXe) {
-            titleXe.classList.remove('title-broken-xe', 'title-repaired-bounce');
+            titleXe.classList.remove('title-broken-xe', 'title-igniting', 'title-repaired-bounce');
         }
         if (titleTang) {
-            titleTang.classList.remove('title-broken-tang', 'title-repaired-bounce');
+            titleTang.classList.remove('title-broken-tang', 'title-igniting', 'title-repaired-bounce');
         }
     }
 
@@ -1549,120 +2251,271 @@ class HomepageEngine {
 
     drawRepairmen() {
         if (!this.repairmen || this.repairmen.length === 0) return;
+
         this.repairmen.forEach(rm => {
             this.ctx.save();
             this.ctx.translate(rm.x, rm.y);
 
+            // Determine direction facing: 1 = face right, -1 = face left
+            let dir = 1;
+            if (rm.state === 'EXITING') {
+                const dx = rm.targetX - rm.x;
+                if (Math.abs(dx) > 1) dir = Math.sign(dx);
+                else dir = rm.team === 'green' ? -1 : 1;
+            } else if (rm.state === 'RUNNING_TO_GROUND') {
+                const currentLetter = (rm.assignedLetters && rm.letterIndex < rm.assignedLetters.length) ? rm.assignedLetters[rm.letterIndex] : null;
+                const targetX = currentLetter ? currentLetter.groundX : rm.x;
+                const dx = targetX - rm.x;
+                if (Math.abs(dx) > 1) dir = Math.sign(dx);
+                else dir = rm.team === 'green' ? 1 : -1;
+            } else {
+                dir = rm.team === 'green' ? 1 : -1;
+            }
+
             // Ground Highlight & Shadow Aura
-            const auraGradient = this.ctx.createRadialGradient(0, 0, 5, 0, 0, 45);
-            auraGradient.addColorStop(0, rm.team === 'green' ? 'rgba(56, 189, 248, 0.5)' : 'rgba(239, 68, 68, 0.5)');
+            const auraGradient = this.ctx.createRadialGradient(0, 0, 3, 0, 0, 25);
+            auraGradient.addColorStop(0, rm.team === 'green' ? 'rgba(56, 189, 248, 0.4)' : 'rgba(239, 68, 68, 0.4)');
             auraGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
             this.ctx.fillStyle = auraGradient;
             this.ctx.beginPath();
-            this.ctx.ellipse(0, 0, 45, 14, 0, 0, Math.PI * 2);
+            this.ctx.ellipse(0, 0, 25, 8, 0, 0, Math.PI * 2);
             this.ctx.fill();
 
-            // Scale character up cleanly (Origin (0,0) is feet on ground)
-            this.ctx.scale(1.8, 1.8);
+            // Enlarge repairmen scale to 1.5x ("2 thợ sửa tăng kích thước lên 1 lần")
+            this.ctx.scale(1.5, 1.5);
 
-            // Running / Working leg animation swing
-            const legSwing = Math.sin(rm.animFrame || 0) * 8;
+            // Running bobbing & leg/arm swing calculation
+            let bob = 0;
+            let legSwing = 0;
+            let armLSwing = 0;
+            let armRSwing = 0;
+            let torsoTilt = 0;
 
-            // 1. Solid Heavy Combat Boots (standing on y = 0)
+            const isRunning = (rm.state === 'RUNNING_TO_GROUND' || rm.state === 'EXITING');
+            const isCarrying = (rm.state === 'CARRYING_UP' || rm.state === 'PLACING_LETTER');
+            const isCursing = (rm.state === 'CURSING');
+            const isWelding = (rm.state === 'WELDING');
+
+            if (isRunning) {
+                legSwing = Math.sin(rm.animFrame || 0) * 10;
+                armLSwing = -Math.sin(rm.animFrame || 0) * 12;
+                armRSwing = Math.sin(rm.animFrame || 0) * 12;
+                bob = Math.abs(Math.sin((rm.animFrame || 0) * 2)) * 3;
+                torsoTilt = dir * 0.14; // Leans in running direction!
+            }
+
+            this.ctx.translate(0, -bob);
+            this.ctx.rotate(torsoTilt);
+
+            // Flip character horizontally according to direction
+            this.ctx.scale(dir, 1);
+
+            // 1. Combat Boots (y = -5 to 0)
             this.ctx.fillStyle = '#0f172a';
-            this.ctx.fillRect(-11 + legSwing * 0.3, -6, 9, 6);
-            this.ctx.fillRect(2 - legSwing * 0.3, -6, 9, 6);
+            this.ctx.fillRect(-9 - legSwing * 0.2, -5, 7, 5);
+            this.ctx.fillRect(2 + legSwing * 0.2, -5, 7, 5);
 
-            // 2. Solid Camo Pants (Pants connect from y = -24 down to y = -6 with NO GAPS!)
+            // 2. Camo Pants (y = -22 to -5)
             this.ctx.fillStyle = rm.team === 'green' ? '#14532d' : '#7f1d1d';
-            // Left leg pant
+            // Left leg
             this.ctx.beginPath();
-            this.ctx.moveTo(-10, -24);
-            this.ctx.lineTo(-2, -24);
-            this.ctx.lineTo(-2 - legSwing * 0.3, -6);
-            this.ctx.lineTo(-10 - legSwing * 0.3, -6);
+            this.ctx.moveTo(-8, -22);
+            this.ctx.lineTo(-1, -22);
+            this.ctx.lineTo(-1 - legSwing * 0.2, -5);
+            this.ctx.lineTo(-8 - legSwing * 0.2, -5);
             this.ctx.closePath();
             this.ctx.fill();
 
-            // Right leg pant
+            // Right leg
             this.ctx.beginPath();
-            this.ctx.moveTo(2, -24);
-            this.ctx.lineTo(10, -24);
-            this.ctx.lineTo(10 + legSwing * 0.3, -6);
-            this.ctx.lineTo(2 + legSwing * 0.3, -6);
+            this.ctx.moveTo(1, -22);
+            this.ctx.lineTo(8, -22);
+            this.ctx.lineTo(8 + legSwing * 0.2, -5);
+            this.ctx.lineTo(1 + legSwing * 0.2, -5);
             this.ctx.closePath();
             this.ctx.fill();
 
-            // Utility Belt (y = -27 to -24)
+            // Utility Belt (y = -25 to -22)
             this.ctx.fillStyle = '#1e293b';
-            this.ctx.fillRect(-12, -27, 24, 4);
-            this.ctx.fillStyle = '#facc15'; // Belt buckle
-            this.ctx.fillRect(-3, -27, 6, 4);
-
-            // 3. High-Vis Mechanic Vest Torso (y = -48 to -27, seamless connection to belt!)
-            this.ctx.fillStyle = rm.team === 'green' ? '#16a34a' : '#dc2626';
-            this.ctx.fillRect(-11, -48, 22, 21);
-            // Reflective stripes across vest
+            this.ctx.fillRect(-10, -25, 20, 3);
             this.ctx.fillStyle = '#facc15';
-            this.ctx.fillRect(-11, -42, 22, 4);
-            this.ctx.fillRect(-11, -34, 22, 4);
-            this.ctx.fillStyle = '#ffffff'; // White reflective tape
-            this.ctx.fillRect(-11, -40, 22, 1.5);
-            this.ctx.fillRect(-11, -32, 22, 1.5);
+            this.ctx.fillRect(-2.5, -25, 5, 3);
 
-            // 4. Arms & Shoulders
-            this.ctx.fillStyle = rm.team === 'green' ? '#15803d' : '#b91c1c';
-            // Left shoulder/arm
-            this.ctx.fillRect(-15, -48, 5, 18);
-            // Right shoulder/arm
-            this.ctx.fillRect(10, -48, 5, 18);
+            // 3. High-Vis Vest Torso (y = -44 to -25)
+            this.ctx.fillStyle = rm.team === 'green' ? '#16a34a' : '#dc2626';
+            this.ctx.fillRect(-9, -44, 18, 19);
+            // Reflective stripes
+            this.ctx.fillStyle = '#facc15';
+            this.ctx.fillRect(-9, -38, 18, 3);
+            this.ctx.fillRect(-9, -31, 18, 3);
 
-            // 5. Head & Face (y = -58 to -48)
-            this.ctx.fillStyle = '#fde047'; // Skin
+            // 4. Head & Helmet (y = -55 to -44)
+            let headAngle = 0;
+            if (isCursing) {
+                headAngle = Math.sin((rm.curseFrame || 0) * 4) * 0.2; // Angry head shake!
+            }
+
+            this.ctx.save();
+            this.ctx.translate(0, -48);
+            this.ctx.rotate(headAngle);
+
+            // Face
+            this.ctx.fillStyle = '#fde047';
             this.ctx.beginPath();
-            this.ctx.arc(0, -53, 7, 0, Math.PI * 2);
+            this.ctx.arc(0, 0, 6, 0, Math.PI * 2);
             this.ctx.fill();
 
-            // Army Welding Helmet (y = -61 to -53)
+            // Helmet
             this.ctx.fillStyle = rm.team === 'green' ? '#14532d' : '#7f1d1d';
             this.ctx.beginPath();
-            this.ctx.arc(0, -56, 9, Math.PI, 0);
+            this.ctx.arc(0, -2, 7.5, Math.PI, 0);
             this.ctx.fill();
-            // Glowing cyan welding visor
-            this.ctx.fillStyle = '#38bdf8';
-            this.ctx.shadowColor = '#38bdf8';
-            this.ctx.shadowBlur = 10;
-            this.ctx.fillRect(-5, -57, 10, 4);
+
+            // Visor (Glows Angry Red when cursing!)
+            this.ctx.fillStyle = isCursing ? '#ef4444' : '#38bdf8';
+            this.ctx.shadowColor = isCursing ? '#ef4444' : '#38bdf8';
+            this.ctx.shadowBlur = 8;
+            this.ctx.fillRect(-4, -3, 8, 3);
             this.ctx.shadowBlur = 0;
 
-            // 6. Welding Torch & Plasma Arc Flash Animation
-            if (this.idleSeqState === 'REPAIRING') {
-                const toolAngle = Math.sin(rm.workFrame || 0) * 0.8;
-                this.ctx.save();
-                this.ctx.translate(0, -38);
-                this.ctx.rotate(toolAngle);
+            this.ctx.restore(); // end head
 
-                // Torch Handle
-                this.ctx.fillStyle = '#0284c7';
-                this.ctx.fillRect(0, -18, 6, 18);
+            // 5. Arms & Actions (Carrying with 2 Hands vs Mechanical Plasma Welder Torch vs 90-Deg Cursing vs Running)
+            this.ctx.fillStyle = rm.team === 'green' ? '#15803d' : '#b91c1c';
 
-                // Torch Nozzle
-                this.ctx.fillStyle = '#38bdf8';
-                this.ctx.shadowColor = '#38bdf8';
-                this.ctx.shadowBlur = 25;
-                this.ctx.fillRect(-3, -24, 12, 6);
+            if (isCursing) {
+                // ANGRY V-SHAPE ARMS RAISED UP ANIMATION (\O/ - Dơ 2 tay LÊN ngả ra tạo hình chữ V rộng vẫy vẫy chửi!)
+                const wave1 = Math.sin((rm.curseFrame || 0) * 14) * 3;
+                const wave2 = Math.cos((rm.curseFrame || 0) * 14) * 3;
 
-                // Electric Plasma Arc Flash Starburst
-                this.ctx.fillStyle = '#ffffff';
+                this.ctx.strokeStyle = rm.team === 'green' ? '#15803d' : '#b91c1c';
+                this.ctx.lineWidth = 5;
+                this.ctx.lineCap = 'round';
+
+                // Left Arm: Shoulder (-8, -38) -> UP-LEFT to (-20, -56 + wave1)
                 this.ctx.beginPath();
-                this.ctx.arc(3, -26, Math.random() * 6 + 4, 0, Math.PI * 2);
+                this.ctx.moveTo(-8, -38);
+                this.ctx.lineTo(-20, -56 + wave1);
+                this.ctx.stroke();
+
+                // Left Fist
+                this.ctx.fillStyle = '#fde047';
+                this.ctx.beginPath();
+                this.ctx.arc(-21, -57 + wave1, 3.5, 0, Math.PI * 2);
                 this.ctx.fill();
 
+                // Right Arm: Shoulder (+8, -38) -> UP-RIGHT to (+20, -56 + wave2)
+                this.ctx.strokeStyle = rm.team === 'green' ? '#15803d' : '#b91c1c';
+                this.ctx.beginPath();
+                this.ctx.moveTo(8, -38);
+                this.ctx.lineTo(20, -56 + wave2);
+                this.ctx.stroke();
+
+                // Right Fist
+                this.ctx.fillStyle = '#fde047';
+                this.ctx.beginPath();
+                this.ctx.arc(21, -57 + wave2, 3.5, 0, Math.PI * 2);
+                this.ctx.fill();
+            } else if (isCarrying) {
+                // 2-HAND CARRYING POSE: BOTH ARMS EXTENDED FORWARD HOLDING LETTER AT TORSO LEVEL!
+                // Left Arm reaching forward
+                this.ctx.save();
+                this.ctx.translate(-8, -35);
+                this.ctx.rotate(Math.PI * 0.15);
+                this.ctx.fillRect(-2, 0, 4, 18);
+                this.ctx.fillStyle = '#fde047';
+                this.ctx.beginPath();
+                this.ctx.arc(0, 18, 3.5, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.restore();
+
+                // Right Arm reaching forward
+                this.ctx.save();
+                this.ctx.fillStyle = rm.team === 'green' ? '#15803d' : '#b91c1c';
+                this.ctx.translate(8, -35);
+                this.ctx.rotate(-Math.PI * 0.15);
+                this.ctx.fillRect(-2, 0, 4, 18);
+                this.ctx.fillStyle = '#fde047';
+                this.ctx.beginPath();
+                this.ctx.arc(0, 18, 3.5, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.restore();
+
+                // RENDER HELD LETTER DIRECTLY IN HIS 2 HANDS AT TORSO LEVEL!
+                if (rm.holdingLetter) {
+                    const titleEl = document.querySelector('.main-title') || document.querySelector('.title-xe');
+                    const fontSizePx = titleEl ? parseFloat(window.getComputedStyle(titleEl).fontSize) : 83;
+                    const carryFontSize = fontSizePx / 1.5; // Scaled down for 1.5x repairman canvas transform
+
+                    this.ctx.save();
+                    this.ctx.font = `900 ${carryFontSize}px "Be Vietnam Pro", "Montserrat", sans-serif`;
+                    this.ctx.fillStyle = '#475569';
+                    this.ctx.strokeStyle = rm.team === 'green' ? '#38bdf8' : '#ef4444';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.shadowColor = rm.team === 'green' ? '#38bdf8' : '#ef4444';
+                    this.ctx.shadowBlur = 8;
+                    this.ctx.strokeText(rm.holdingLetter.char, 10, -32);
+                    this.ctx.fillText(rm.holdingLetter.char, 10, -32);
+                    this.ctx.restore();
+                }
+            } else if (isWelding) {
+                // Mechanical Plasma Welder Machine (Rút máy hàn cơ khí ra hàn với tia lửa hàn plasma!)
+                const toolAngle = Math.sin((rm.workFrame || 0) * 0.8) * 0.4;
+
+                this.ctx.fillRect(-11, -40, 4, 13);
+                this.ctx.fillRect(7, -40, 4, 13);
+
+                this.ctx.save();
+                this.ctx.translate(5, -34);
+                this.ctx.rotate(-Math.PI * 0.25 + toolAngle);
+
+                // Heavy mechanical torch handle & plasma nozzle
+                this.ctx.fillStyle = '#0284c7';
+                this.ctx.fillRect(0, -16, 6, 16);
+                this.ctx.fillStyle = '#38bdf8';
+                this.ctx.shadowColor = '#38bdf8';
+                this.ctx.shadowBlur = 12;
+                this.ctx.fillRect(-3, -20, 12, 5);
+
+                // Plasma Flash
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.beginPath();
+                this.ctx.arc(3, -22, Math.random() * 5 + 3, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.shadowBlur = 0;
+
+                this.ctx.restore();
+            } else {
+                // Running arm swinging
+                this.ctx.save();
+                this.ctx.translate(-9, -40);
+                this.ctx.rotate(armLSwing * 0.05);
+                this.ctx.fillRect(-2, 0, 4, 14);
+                this.ctx.restore();
+
+                this.ctx.save();
+                this.ctx.translate(9, -40);
+                this.ctx.rotate(armRSwing * 0.05);
+                this.ctx.fillRect(-2, 0, 4, 14);
                 this.ctx.restore();
             }
 
             this.ctx.restore();
         });
+    }
+
+    updateTitleRects() {
+        const titleXeEl = document.querySelector('.title-xe');
+        const titleTangEl = document.querySelector('.title-tang');
+        const mainTitleEl = document.querySelector('.main-title');
+        if (titleXeEl) this.titleXeRect = titleXeEl.getBoundingClientRect();
+        if (titleTangEl) this.titleTangRect = titleTangEl.getBoundingClientRect();
+        if (mainTitleEl) {
+            const r = mainTitleEl.getBoundingClientRect();
+            this.titleCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        }
     }
 }
 

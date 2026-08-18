@@ -7,6 +7,7 @@ let player = null;
 let enemies = [];
 let keys = {};
 let mousePos = { x: 0, y: 0 };
+let isMouseInMap = false;
 let killCount = 0;
 let gameState = 'START'; // 'START', 'PLAYING', 'GAMEOVER', 'WIN'
 let isPaused = false;
@@ -25,16 +26,28 @@ window.addEventListener('keyup', (e) => {
     keys[e.key.toLowerCase()] = false;
 });
 
-canvas.addEventListener('mousemove', (e) => {
+function handleMouseTrack(e) {
     const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    mousePos.x = (e.clientX - rect.left) * scaleX;
-    mousePos.y = (e.clientY - rect.top) * scaleY;
-});
 
-canvas.addEventListener('mousedown', (e) => {
+    const rawX = (e.clientX - rect.left) * scaleX;
+    const rawY = (e.clientY - rect.top) * scaleY;
+
+    // Giới hạn tâm ngắm strictly trong mép bản đồ (0 -> CANVAS_WIDTH, 0 -> CANVAS_HEIGHT)
+    mousePos.x = Math.max(0, Math.min(CANVAS_WIDTH, rawX));
+    mousePos.y = Math.max(0, Math.min(CANVAS_HEIGHT, rawY));
+}
+
+window.addEventListener('mousemove', handleMouseTrack);
+
+window.addEventListener('mousedown', (e) => {
     if (e.button === 0 && gameState === 'PLAYING' && !isPaused && player && player.alive) {
+        // Nếu click vào nút bấm UI thì không bắn đạn
+        if (e.target && (e.target.tagName === 'BUTTON' || e.target.closest('button'))) {
+            return;
+        }
         audio.init();
         player.shoot();
     }
@@ -74,7 +87,7 @@ if (mapBtn) {
     mapBtn.addEventListener('click', () => {
         if (gameState !== 'PLAYING') {
             audio.init();
-            initGame((currentMapIndex + 1) % MAP_DEFINITIONS.length);
+            initGame((currentMapIndex + 1) % 3);
         }
     });
 }
@@ -95,7 +108,10 @@ function triggerMapRoulette(onComplete) {
     hideGameElements();
     modal.classList.remove('hidden');
 
-    // Build strip: repeat MAP_DEFINITIONS 14 times for smooth long scrolling
+    // Active maps for roulette wheel (only first 3 maps; Map 4 is tucked away for maintenance)
+    const activeMaps = MAP_DEFINITIONS.slice(0, 3);
+
+    // Build strip: repeat activeMaps 14 times for smooth long scrolling
     strip.innerHTML = '';
     strip.style.transition = 'none';
     strip.style.transform = 'translateX(0px)';
@@ -104,7 +120,7 @@ function triggerMapRoulette(onComplete) {
     const cards = [];
 
     for (let r = 0; r < totalRepeats; r++) {
-        MAP_DEFINITIONS.forEach((mapDef, idx) => {
+        activeMaps.forEach((mapDef, idx) => {
             const card = document.createElement('div');
             card.className = 'roulette-card';
             card.innerHTML = `
@@ -116,9 +132,9 @@ function triggerMapRoulette(onComplete) {
         });
     }
 
-    // Randomly select winning map index
-    const winningMapIdx = Math.floor(Math.random() * MAP_DEFINITIONS.length);
-    const targetCardIndex = (totalRepeats - 3) * MAP_DEFINITIONS.length + winningMapIdx;
+    // Randomly select winning map out of 3 active maps with equal probability (1/3 each)
+    const winningMapIdx = Math.floor(Math.random() * 3);
+    const targetCardIndex = (totalRepeats - 3) * activeMaps.length + winningMapIdx;
 
     const cardWidth = 200;
     const cardGap = 20;
@@ -332,6 +348,8 @@ function gameLoop() {
                 }
                 player.moveWithWallSliding(dx, dy);
                 player.bodyAngle = Math.atan2(dy, dx);
+            } else {
+                player.moveWithWallSliding(0, 0);
             }
 
             player.turretAngle = Math.atan2(mousePos.y - player.y, mousePos.x - player.x);

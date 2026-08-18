@@ -22,6 +22,7 @@ class Bullet {
 
     update() {
         if (!this.alive) return;
+        this._predictedPoints = null;
 
         // Countdown 4-second life limit
         this.life--;
@@ -43,6 +44,18 @@ class Bullet {
         for (let s = 0; s < steps; s++) {
             this.x += subVx;
             this.y += subVy;
+
+            // Electric Pylons & Laser Walls Collision for Bullet in Map 4
+            if (typeof currentMapIndex !== 'undefined' && currentMapIndex === 3 && typeof checkElectricWallCollideAt === 'function') {
+                if (checkElectricWallCollideAt(this.x, this.y, this.radius)) {
+                    this.hasBounced = true;
+                    this.vx = -this.vx;
+                    this.vy = -this.vy;
+                    if (typeof createSparks === 'function') createSparks(this.x, this.y);
+                    if (typeof audio !== 'undefined' && audio.playBounce) audio.playBounce();
+                    break;
+                }
+            }
 
             // Wall Collision & Bouncing
             for (const wall of walls) {
@@ -112,11 +125,17 @@ class Bullet {
         }
         ctx.restore();
 
-        // Draw Main Glowing Bullet
+        // Draw Main Glowing Bullet (Dual-Layer Glow for 60 FPS performance without shadowBlur)
         ctx.save();
         ctx.globalAlpha = Math.min(1, (this.life / 20)); // Fade out near end of 4s
-        ctx.shadowColor = glowColor;
-        ctx.shadowBlur = 12;
+        
+        // Outer Glow Circle (Lightweight vector glow)
+        ctx.fillStyle = isPlayer ? 'rgba(56, 189, 248, 0.35)' : 'rgba(239, 68, 68, 0.35)';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 1.7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Main Bullet Body
         ctx.fillStyle = mainColor;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);

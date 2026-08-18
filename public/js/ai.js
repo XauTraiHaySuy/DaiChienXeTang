@@ -48,14 +48,26 @@ class EnemyTank extends Tank {
         this.unStuckForceTimer = 0;
         this.unStuckDir = 0;
         this.lastDistMoved = 1.0;
+
+        // Ricochet Raycast Caching (Runs once every 8 frames for high 60FPS performance)
+        this.ricochetTimer = 0;
+        this.cachedAimAngle = null;
+        this.cachedHasShot = false;
     }
 
     findRandomPatrolPoint() {
+        let maxSearchDist = 9999;
+        if (typeof currentMapIndex !== 'undefined' && currentMapIndex === 3 && typeof electricPhase !== 'undefined' && electricPhase !== 'ACTIVE') {
+            maxSearchDist = 225; // 50% total reduced patrol scan radius in Map 4 when inactive
+        }
+
         for (let attempt = 0; attempt < 35; attempt++) {
             const testX = Math.floor(Math.random() * (CANVAS_WIDTH - 160)) + 80;
             const testY = Math.floor(Math.random() * (CANVAS_HEIGHT - 160)) + 80;
-            if (!checkWallCollideAt(testX, testY, this.radius + 10)) {
-                return { x: testX, y: testY };
+            if (Math.hypot(testX - this.x, testY - this.y) <= maxSearchDist) {
+                if (!checkWallCollideAt(testX, testY, this.radius + 10)) {
+                    return { x: testX, y: testY };
+                }
             }
         }
         return { x: this.x, y: this.y };
@@ -74,9 +86,12 @@ class EnemyTank extends Tank {
                     const dist = Math.hypot(other.x - this.x, other.y - this.y);
                     const minDist = this.radius + other.radius + 10;
                     if (dist < minDist && dist > 0) {
-                        const pushX = (this.x - other.x) / dist * 2.2;
-                        const pushY = (this.y - other.y) / dist * 2.2;
-                        this.moveWithWallSliding(pushX, pushY);
+                        const pushX = (this.x - other.x) / dist * 1.5;
+                        const pushY = (this.y - other.y) / dist * 1.5;
+                        if (!this.checkWallCollide(this.x + pushX, this.y + pushY)) {
+                            this.x += pushX;
+                            this.y += pushY;
+                        }
                     }
                 }
             });
@@ -89,68 +104,47 @@ class EnemyTank extends Tank {
         this.lastDistMoved = distMoved;
         if (distMoved < 0.3) {
             this.stuckTimer++;
+            if (this.stuckTimer > 20) {
+                this.unStuckForceTimer = 35;
+                this.unStuckDir = Math.random() * Math.PI * 2;
+                this.stuckTimer = 0;
+            }
         } else {
             this.stuckTimer = Math.max(0, this.stuckTimer - 1);
         }
         this.lastPosition = { x: this.x, y: this.y };
 
-        if (this.stuckTimer > 6) {
-            let escapeAngle = this.bodyAngle + Math.PI;
-            for (let a = 0; a < 24; a++) {
-                const testA = (a * Math.PI) / 12;
-                const testX = this.x + Math.cos(testA) * 22;
-                const testY = this.y + Math.sin(testA) * 22;
-                if (!this.checkWallCollide(testX, testY)) {
-                    escapeAngle = testA;
-                    break;
-                }
-            }
-            this.unStuckForceTimer = 10;
-            this.unStuckDir = escapeAngle;
-            this.stuckTimer = 0;
-            this.pathNodes = [];
-            this.patrolTarget = null;
-        }
-
         // ----------------------------------------------------
-        // 3. ULTRA TACTICAL BULLET EVASION & STRAFING SYSTEM
+        // 3. BULLET EVASION VECTORS (Dodge Incoming Bullets)
         // ----------------------------------------------------
         let dodgeAngle = null;
-        let highestDanger = 0;
         const threatPoints = [];
         const threatVectors = [];
 
         if (allBullets) {
             for (const b of allBullets) {
-                // Dodge Player bullets or Blue Support Tank bullets
-                if (!b.alive || !b.owner) continue;
-                const isHostileBullet = b.owner.isPlayer || (b.owner.team === 'blue');
-                if (!isHostileBullet) continue;
-
-                const distToBullet = Math.hypot(b.x - this.x, b.y - this.y);
-                if (distToBullet < 480) {
-                    // Predict 50 trajectory steps (including wall ricochets)
-                    const trajectory = predictBulletPoints(b, 50);
-                    for (let i = 0; i < trajectory.length; i++) {
-                        const pt = trajectory[i];
-                        const distToPt = Math.hypot(pt.x - this.x, pt.y - this.y);
-                        if (distToPt < this.radius + 40) {
-                            highestDanger++;
-                            threatPoints.push(pt);
-                            threatVectors.push({ vx: b.vx, vy: b.vy });
-                        }
+                if (!b.alive || b.owner === this) continue;
+                if (!b._predictedPoints) {
+                    b._predictedPoints = predictBulletPoints(b, 18);
+                }
+                const bulletPredicted = b._predictedPoints;
+                for (const pt of bulletPredicted) {
+                    const d = Math.hypot(this.x - pt.x, this.y - pt.y);
+                    if (d < 42) { // 15% total reduced bullet evasion warning radius (was 50px)
+                        threatPoints.push(pt);
+                        threatVectors.push({ vx: b.vx, vy: b.vy });
+                        break;
                     }
                 }
             }
         }
 
-        if (highestDanger > 0) {
+        if (threatPoints.length > 0) {
+            let maxSafetyScore = -99999;
             let bestAngle = null;
-            let maxSafetyScore = -999999;
 
-            // Evaluate 24 candidate dodge angles (15-degree resolution)
-            for (let i = 0; i < 24; i++) {
-                const candAngle = (i * Math.PI) / 12;
+            for (let i = 0; i < 12; i++) {
+                const candAngle = (i * Math.PI) / 6;
                 const testStep = 22;
                 const candX = this.x + Math.cos(candAngle) * testStep;
                 const candY = this.y + Math.sin(candAngle) * testStep;
@@ -163,12 +157,10 @@ class EnemyTank extends Tank {
                     if (d < minDistToBullet) minDistToBullet = d;
                 }
 
-                // Prefer strafing perpendicular to bullet trajectory
                 let strafeBonus = 0;
                 for (const tv of threatVectors) {
                     const bulletAngle = Math.atan2(tv.vy, tv.vx);
                     const angleDiff = Math.abs(Math.atan2(Math.sin(candAngle - bulletAngle), Math.cos(candAngle - bulletAngle)));
-                    // Highest bonus for perpendicular movement (around Math.PI / 2)
                     strafeBonus += Math.sin(angleDiff) * 30;
                 }
 
@@ -187,11 +179,24 @@ class EnemyTank extends Tank {
         // ----------------------------------------------------
         // 4. SMART PURSUIT & MAZE PATHFINDING (State Machine)
         // ----------------------------------------------------
+        // Map 4 Specific AI Range Adjustment:
+        // When in Map 4 and electric pylons are NOT connected (electricPhase !== 'ACTIVE'),
+        // reduce target detection and scanning range by an extra 25% (total 50% reduction).
+        let rangeMultiplier = 1.0;
+        if (typeof currentMapIndex !== 'undefined' && currentMapIndex === 3 && typeof electricPhase !== 'undefined' && electricPhase !== 'ACTIVE') {
+            rangeMultiplier = 0.50; // Total 50% reduction (reduced by another 25%) when inactive in Map 4
+        }
+
+        const effectiveDetectionDist = 450 * rangeMultiplier; // 450px -> 225px when inactive in Map 4
+        const maxLOSDist = 1200 * rangeMultiplier;            // 1200px -> 600px when inactive in Map 4
+
         const hasLOS = (player && player.alive) ? hasLineOfSight({ x: this.x, y: this.y }, { x: player.x, y: player.y }) : false;
         const distToPlayer = (player && player.alive) ? Math.hypot(player.x - this.x, player.y - this.y) : 9999;
 
-        // Radio / Sensor Awareness: Switch to attack if in LOS or within 450px
-        if (player && player.alive && (hasLOS || distToPlayer < 450)) {
+        // Detection check considering 25% range reduction in Map 4 inactive state:
+        const canDetectPlayer = player && player.alive && ((hasLOS && distToPlayer <= maxLOSDist) || distToPlayer <= effectiveDetectionDist);
+
+        if (canDetectPlayer) {
             this.aiState = 'attack';
         } else {
             this.aiState = 'search';
@@ -209,36 +214,44 @@ class EnemyTank extends Tank {
             const wasBlocked = distMoved < 0.3;
             this.repathTimer--;
 
-            if (!hasLOS || wasBlocked || this.repathTimer <= 0 || !this.pathNodes || this.pathNodes.length === 0) {
-                this.repathTimer = hasLOS ? 10 : 6;
-                this.pathNodes = findPathAStar({ x: this.x, y: this.y }, { x: player.x, y: player.y });
-                this.pathIndex = 0;
-            }
-
-            if (this.pathNodes && this.pathNodes.length > 0) {
-                while (this.pathIndex < this.pathNodes.length - 1) {
-                    const nextNode = this.pathNodes[this.pathIndex + 1];
-                    const distToCurrent = Math.hypot(this.pathNodes[this.pathIndex].x - this.x, this.pathNodes[this.pathIndex].y - this.y);
-                    if (distToCurrent < 18 || hasLineOfSight({ x: this.x, y: this.y }, nextNode, 12)) {
-                        this.pathIndex++;
-                    } else {
-                        break;
-                    }
-                }
-
-                let targetNode = this.pathNodes[this.pathIndex];
-                if (targetNode) {
-                    moveAngle = Math.atan2(targetNode.y - this.y, targetNode.x - this.x);
-                } else if (hasLOS) {
-                    moveAngle = Math.atan2(player.y - this.y, player.x - this.x);
-                } else {
-                    moveAngle = findWallSlideDirection(this, player.x, player.y);
-                }
+            if (hasLOS && !wasBlocked) {
+                // Direct pursuit when Line of Sight is clear (Zero A* pathfinding overhead!)
+                moveAngle = Math.atan2(player.y - this.y, player.x - this.x);
+                this.pathNodes = null;
             } else {
-                if (hasLOS) {
-                    moveAngle = Math.atan2(player.y - this.y, player.x - this.x);
+                if (this.repathTimer <= 0 || !this.pathNodes || this.pathNodes.length === 0) {
+                    this.repathTimer = wasBlocked ? 18 + Math.floor(Math.random() * 10) : 35 + Math.floor(Math.random() * 20);
+                    if (typeof findPathAStar === 'function') {
+                        this.pathNodes = findPathAStar({ x: this.x, y: this.y }, { x: player.x, y: player.y });
+                    }
+                    this.pathIndex = 0;
+                }
+
+                if (this.pathNodes && this.pathNodes.length > 0) {
+                    while (this.pathIndex < this.pathNodes.length - 1) {
+                        const nextNode = this.pathNodes[this.pathIndex + 1];
+                        const distToCurrent = Math.hypot(this.pathNodes[this.pathIndex].x - this.x, this.pathNodes[this.pathIndex].y - this.y);
+                        if (distToCurrent < 18 || hasLineOfSight({ x: this.x, y: this.y }, nextNode, 12)) {
+                            this.pathIndex++;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    let targetNode = this.pathNodes[this.pathIndex];
+                    if (targetNode) {
+                        moveAngle = Math.atan2(targetNode.y - this.y, targetNode.x - this.x);
+                    } else if (hasLOS) {
+                        moveAngle = Math.atan2(player.y - this.y, player.x - this.x);
+                    } else {
+                        moveAngle = findWallSlideDirection(this, player.x, player.y);
+                    }
                 } else {
-                    moveAngle = findWallSlideDirection(this, player.x, player.y);
+                    if (hasLOS) {
+                        moveAngle = Math.atan2(player.y - this.y, player.x - this.x);
+                    } else {
+                        moveAngle = findWallSlideDirection(this, player.x, player.y);
+                    }
                 }
             }
         } else {
@@ -291,12 +304,12 @@ class EnemyTank extends Tank {
         // 5. PREDICTIVE AIMING & WALL-BOUNCE SNIPE SHOOTING
         // ----------------------------------------------------
         if (player && player.alive && (this.aiState === 'attack' || hasLOS)) {
-            // Predict Player Position (Lead target by 8 frames)
+            // Predict Player Position (Lead target by 6 frames - 15% total relaxed lead)
             const pDx = player.x - (player.lastX || player.x);
             const pDy = player.y - (player.lastY || player.y);
             const targetPos = {
-                x: player.x + pDx * 8,
-                y: player.y + pDy * 8
+                x: player.x + pDx * 6,
+                y: player.y + pDy * 6
             };
 
             let chosenAimAngle = Math.atan2(targetPos.y - this.y, targetPos.x - this.x);
@@ -308,37 +321,67 @@ class EnemyTank extends Tank {
             if (directHit && directHit.distance >= distToTarget - 16) {
                 hasShotOpportunity = true;
             } else {
-                // 36 Radial Angles Ricochet Bounce Scanner
-                for (let a = 0; a < Math.PI * 2; a += (Math.PI * 2 / 36)) {
-                    const hit1 = castRay({ x: this.x, y: this.y }, a, 900);
-                    if (hit1) {
-                        const rx = Math.cos(a);
-                        const ry = Math.sin(a);
-                        const dot = rx * hit1.normal.x + ry * hit1.normal.y;
-                        const refX = rx - 2 * dot * hit1.normal.x;
-                        const refY = ry - 2 * dot * hit1.normal.y;
-                        const refAngle = Math.atan2(refY, refX);
+                // 16 Radial Angles Ricochet Bounce Scanner (Cached every 8 frames for 60FPS performance)
+                this.ricochetTimer--;
+                if (this.ricochetTimer <= 0) {
+                    this.ricochetTimer = 8;
+                    this.cachedHasShot = false;
+                    this.cachedAimAngle = chosenAimAngle;
 
-                        const hit2 = castRay(hit1.point, refAngle, 700);
-                        const distFromHit1ToTarget = Math.hypot(targetPos.x - hit1.point.x, targetPos.y - hit1.point.y);
+                    for (let a = 0; a < Math.PI * 2; a += (Math.PI * 2 / 16)) {
+                        const hit1 = castRay({ x: this.x, y: this.y }, a, 900);
+                        if (hit1) {
+                            const rx = Math.cos(a);
+                            const ry = Math.sin(a);
+                            const dot = rx * hit1.normal.x + ry * hit1.normal.y;
+                            const refX = rx - 2 * dot * hit1.normal.x;
+                            const refY = ry - 2 * dot * hit1.normal.y;
+                            const refAngle = Math.atan2(refY, refX);
 
-                        if (hit2 && Math.abs(hit2.distance - distFromHit1ToTarget) < 36) {
-                            chosenAimAngle = a;
-                            hasShotOpportunity = true;
-                            break;
+                            const hit2 = castRay(hit1.point, refAngle, 700);
+                            const distFromHit1ToTarget = Math.hypot(targetPos.x - hit1.point.x, targetPos.y - hit1.point.y);
+
+                            if (hit2 && Math.abs(hit2.distance - distFromHit1ToTarget) < 36) {
+                                this.cachedAimAngle = a;
+                                this.cachedHasShot = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (this.cachedHasShot) {
+                    chosenAimAngle = this.cachedAimAngle;
+                    hasShotOpportunity = true;
+                }
+            }
+
+            // Friendly Fire Protection: Don't shoot if a Red teammate is standing in line of fire!
+            let teammateInWay = false;
+            if (allEnemies) {
+                for (const teammate of allEnemies) {
+                    if (teammate !== this && teammate.alive) {
+                        const distToTeammate = Math.hypot(teammate.x - this.x, teammate.y - this.y);
+                        if (distToTeammate < distToTarget) {
+                            const angleToTeammate = Math.atan2(teammate.y - this.y, teammate.x - this.x);
+                            const aimDiff = Math.abs(Math.atan2(Math.sin(chosenAimAngle - angleToTeammate), Math.cos(chosenAimAngle - angleToTeammate)));
+                            if (aimDiff < 0.35) { // Teammate is right in front of turret line of fire!
+                                teammateInWay = true;
+                                break;
+                            }
                         }
                     }
                 }
             }
 
-            // Rapid Turret Lock-On Speed (0.28 rad/frame)
+            // Turret Lock-On Speed (0.235 rad/frame - 15% total relaxed turret speed)
             const angleDiff = Math.atan2(Math.sin(chosenAimAngle - this.turretAngle), Math.cos(chosenAimAngle - this.turretAngle));
-            this.turretAngle += angleDiff * 0.28;
+            this.turretAngle += angleDiff * 0.235;
 
             this.shootTimer--;
             if (this.shootTimer <= 0) {
-                this.shootTimer = Math.floor(Math.random() * 25) + 12;
-                if (hasShotOpportunity && Math.abs(angleDiff) < 0.45) {
+                this.shootTimer = Math.floor(Math.random() * 30) + 15; // 15% total longer shoot interval
+                if (hasShotOpportunity && !teammateInWay && Math.abs(angleDiff) < 0.45) {
                     this.shoot();
                 }
             }

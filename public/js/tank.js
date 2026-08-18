@@ -15,15 +15,20 @@ class Tank {
         this.alive = true;
         this.cooldown = 0;
 
-        // Status Effects (Stun & Slow)
+        // Status Effects (Stun, EMP Slow & Bee Stung)
         this.stunTimer = 0; // Frames immobilized (3s = 180 frames)
         this.slowTimer = 0; // Frames slowed down by EMP
+        this.beeStungTimer = 0; // Frames slowed down by Angry Bees (4s = 240 frames)
 
         // Recoil FX
         this.recoilOffset = 0;
         this.lastX = x;
         this.lastY = y;
         this.distanceMoved = 0;
+
+        // Ice Physics Velocity
+        this.vx = 0;
+        this.vy = 0;
     }
 
     checkWallCollide(nx, ny) {
@@ -37,7 +42,14 @@ class Tank {
             return true;
         }
 
-        // 2. Maze Wall Collision Check
+        // 2. Map 4 Electric Pylons & Electric Walls Collision Check
+        if (typeof currentMapIndex !== 'undefined' && currentMapIndex === 3 && typeof checkElectricWallCollideAt === 'function') {
+            if (checkElectricWallCollideAt(nx, ny, this.radius)) {
+                return true;
+            }
+        }
+
+        // 3. Maze Wall Collision Check
         for (const w of walls) {
             const closestX = Math.max(w.x, Math.min(nx, w.x + w.w));
             const closestY = Math.max(w.y, Math.min(ny, w.y + w.h));
@@ -60,21 +72,84 @@ class Tank {
         if (this.slowTimer > 0) {
             speedMultiplier = 0.25; // 25% speed under EMP slow
         }
+        if (this.beeStungTimer > 0) {
+            speedMultiplier *= 0.2; // 80% speed reduction under Angry Bee Stung!
+        }
 
         const actualDx = dx * speedMultiplier;
         const actualDy = dy * speedMultiplier;
 
-        let nextX = this.x + actualDx;
-        let nextY = this.y + actualDy;
+        const isIceMap = (typeof currentMapIndex !== 'undefined' && currentMapIndex === 2);
+        const onNonSlip = isIceMap && typeof isOnNonSlipPatch === 'function' ? isOnNonSlipPatch(this.x, this.y) : false;
 
         let moved = false;
-        if (!this.checkWallCollide(nextX, this.y)) {
-            this.x = nextX;
-            moved = true;
-        }
-        if (!this.checkWallCollide(this.x, nextY)) {
-            this.y = nextY;
-            moved = true;
+
+        if (isIceMap && !onNonSlip) {
+            // ICE MAP PHYSICS: 3x Increased Slipperiness (High Drift & 3x Longer Coasting Slide)
+            if (actualDx !== 0 || actualDy !== 0) {
+                this.vx = this.vx * 0.91 + actualDx * 0.16;
+                this.vy = this.vy * 0.91 + actualDy * 0.16;
+            } else {
+                // 3x lower friction when coasting (decay factor ~0.977 vs ~0.93, slides 3x farther!)
+                this.vx *= 0.977;
+                this.vy *= 0.977;
+                if (Math.abs(this.vx) < 0.02) this.vx = 0;
+                if (Math.abs(this.vy) < 0.02) this.vy = 0;
+            }
+
+            // Cap maximum ice sliding speed smoothly
+            const maxIceSpeed = (this.isPlayer ? this.speed : 2.5) * 1.4;
+            const curSpeed = Math.hypot(this.vx, this.vy);
+            if (curSpeed > maxIceSpeed) {
+                this.vx = (this.vx / curSpeed) * maxIceSpeed;
+                this.vy = (this.vy / curSpeed) * maxIceSpeed;
+            }
+
+            // Move X with Wall Bounce (Dynamic Elasticity: Fast impact = strong bounce, slow impact = weak bounce)
+            let nextX = this.x + this.vx;
+            if (!this.checkWallCollide(nextX, this.y)) {
+                this.x = nextX;
+                moved = true;
+            } else {
+                const impactSpeedX = Math.abs(this.vx);
+                if (impactSpeedX > 0.4 && typeof audio !== 'undefined') {
+                    audio.playBounce();
+                }
+                // Elasticity scales dynamically with impact speed: 0.28 (weak) up to 0.92 (strong)
+                const bounceCoeffX = 0.28 + Math.min(0.64, (impactSpeedX / 3.5) * 0.64);
+                this.vx = -this.vx * bounceCoeffX;
+            }
+
+            // Move Y with Wall Bounce (Dynamic Elasticity: Fast impact = strong bounce, slow impact = weak bounce)
+            let nextY = this.y + this.vy;
+            if (!this.checkWallCollide(this.x, nextY)) {
+                this.y = nextY;
+                moved = true;
+            } else {
+                const impactSpeedY = Math.abs(this.vy);
+                if (impactSpeedY > 0.4 && typeof audio !== 'undefined') {
+                    audio.playBounce();
+                }
+                // Elasticity scales dynamically with impact speed: 0.28 (weak) up to 0.92 (strong)
+                const bounceCoeffY = 0.28 + Math.min(0.64, (impactSpeedY / 3.5) * 0.64);
+                this.vy = -this.vy * bounceCoeffY;
+            }
+        } else {
+            // NORMAL GROUND / NON-SLIP ICE ISLAND PHYSICS: Standard wall sliding, NO bounce
+            this.vx = 0;
+            this.vy = 0;
+
+            let nextX = this.x + actualDx;
+            let nextY = this.y + actualDy;
+
+            if (!this.checkWallCollide(nextX, this.y)) {
+                this.x = nextX;
+                moved = true;
+            }
+            if (!this.checkWallCollide(this.x, nextY)) {
+                this.y = nextY;
+                moved = true;
+            }
         }
 
         // Hard Boundary Clamp to Canvas Map Limits (strictly inside 20px outer metal walls)
@@ -90,14 +165,50 @@ class Tank {
             const dist = Math.hypot(this.x - this.lastX, this.y - this.lastY);
             this.distanceMoved += dist;
             if (this.distanceMoved > 16) {
-                trackMarks.push(new TrackMark(this.x, this.y, this.bodyAngle));
-                if (trackMarks.length > 250) trackMarks.shift();
+                if (typeof addTrackMark === 'function') addTrackMark(new TrackMark(this.x, this.y, this.bodyAngle));
+                else {
+                    trackMarks.push(new TrackMark(this.x, this.y, this.bodyAngle));
+                    if (trackMarks.length > 40) trackMarks.shift();
+                }
                 this.distanceMoved = 0;
             }
         }
 
         this.lastX = this.x;
         this.lastY = this.y;
+    }
+
+    applyWindPush(windX, windY) {
+        if (this.stunTimer > 0 || !this.alive) return;
+
+        const isIceMap = (typeof currentMapIndex !== 'undefined' && currentMapIndex === 2);
+        const onNonSlip = isIceMap && typeof isOnNonSlipPatch === 'function' ? isOnNonSlipPatch(this.x, this.y) : false;
+
+        if (isIceMap && !onNonSlip) {
+            // ICE MAP: Wind adds impulse to ice sliding velocity
+            this.vx += windX * 0.35;
+            this.vy += windY * 0.35;
+        } else {
+            // NON-SLIP ICE ISLAND / REGULAR GROUND: Wind pushes position directly with Wall-Sliding, NO bounce
+            let nextX = this.x + windX;
+            let nextY = this.y + windY;
+
+            if (!this.checkWallCollide(nextX, this.y)) {
+                this.x = nextX;
+            }
+            if (!this.checkWallCollide(this.x, nextY)) {
+                this.y = nextY;
+            }
+        }
+
+        // Hard Boundary Clamp
+        const minX = WALL_THICKNESS + this.radius;
+        const maxX = CANVAS_WIDTH - WALL_THICKNESS - this.radius;
+        const minY = WALL_THICKNESS + this.radius;
+        const maxY = CANVAS_HEIGHT - WALL_THICKNESS - this.radius;
+
+        this.x = Math.max(minX, Math.min(maxX, this.x));
+        this.y = Math.max(minY, Math.min(maxY, this.y));
     }
 
     getValidMuzzlePosition() {
@@ -178,6 +289,7 @@ class Tank {
 
         if (this.stunTimer > 0) this.stunTimer--;
         if (this.slowTimer > 0) this.slowTimer--;
+        if (this.beeStungTimer > 0) this.beeStungTimer--;
     }
 
     draw(ctx) {
@@ -186,14 +298,85 @@ class Tank {
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        // Status Effects Indicator Above Tank
-        if (this.stunTimer > 0) {
+        if (this.beeStungTimer > 0) {
+            // Animated Ong đang chích text (smaller 10px font, +0.25x faster dots: 520ms interval)
+            const dotCycle = Math.floor((Date.now() / 520) % 4);
+            const dots = '.'.repeat(dotCycle);
+
             ctx.save();
-            ctx.fillStyle = '#ef4444';
-            ctx.font = 'bold 12px sans-serif';
+            ctx.fillStyle = '#facc15';
+            ctx.shadowColor = '#ca8a04';
+            ctx.shadowBlur = 4;
+            ctx.font = 'bold 10px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(`🕸️ BỊ DÍNH BẪY (${Math.ceil(this.stunTimer / 60)}s)`, 0, -this.radius - 16);
+            ctx.fillText(`🐝 Ong đang chích${dots}`, 0, -this.radius - 20);
             ctx.restore();
+
+            // 3 Bees Grouped Together on ONE SIDE Competing to Rapidly Lunge & Sting ("Đứng về 1 phía thi nhau chích")
+            const time = Date.now() / 60;
+            const groupBaseAngle = -Math.PI * 0.75; // All 3 bees swarm together on the same rear-left side!
+            const offsets = [-11, 0, 11]; // Side-by-side spacing on that same 1 side
+
+            for (let i = 0; i < 3; i++) {
+                const sideOffset = offsets[i];
+                // Sharp lunge / sting oscillation plunging into armor
+                const stingLunge = Math.sin(time * 3.2 + i * 2.1);
+                const dist = (this.radius + 12) - stingLunge * 7.5;
+
+                // Position on ONE SIDE with lateral offset
+                const baseBx = Math.cos(groupBaseAngle) * dist;
+                const baseBy = Math.sin(groupBaseAngle) * dist;
+
+                // Perpendicular vector for side-by-side grouping on that 1 side
+                const perpX = -Math.sin(groupBaseAngle) * sideOffset;
+                const perpY = Math.cos(groupBaseAngle) * sideOffset;
+
+                const bx = baseBx + perpX;
+                const by = baseBy + perpY;
+
+                ctx.save();
+                ctx.translate(bx, by);
+                // Bees on that 1 side point their tail stingers directly at tank hull!
+                ctx.rotate(groupBaseAngle + Math.PI);
+
+                // Bee Body
+                ctx.fillStyle = '#facc15';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 5, 3.8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Black Stripes
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(-2, -3.8, 1.5, 7.6);
+                ctx.fillRect(1, -3.8, 1.5, 7.6);
+
+                // Sharp Red Stinger at Tail (pointing forward at tank armor)
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.moveTo(5, 0);
+                ctx.lineTo(8, -1.8);
+                ctx.lineTo(8, 1.8);
+                ctx.closePath();
+                ctx.fill();
+
+                // Buzzing Wings Flapping Rapidly
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+                const wingW = 4 + Math.sin(time * 14 + i) * 2;
+                ctx.beginPath();
+                ctx.ellipse(-1, -3.5, wingW, 2, -0.3, 0, Math.PI * 2);
+                ctx.ellipse(-1, 3.5, wingW, 2, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Tiny spark flash at impact when stinger jabs armor!
+                if (stingLunge > 0.5) {
+                    ctx.fillStyle = '#fef08a';
+                    ctx.beginPath();
+                    ctx.arc(8, 0, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
         } else if (this.slowTimer > 0) {
             ctx.save();
             ctx.fillStyle = '#facc15';
@@ -208,7 +391,7 @@ class Tank {
         const cosT = Math.cos(this.turretAngle);
         const sinT = Math.sin(this.turretAngle);
         if (typeof checkWallCollideAt === 'function') {
-            for (let d = 20; d <= 180; d += 6) {
+            for (let d = 20; d <= 180; d += 16) {
                 const lx = this.x + cosT * d;
                 const ly = this.y + sinT * d;
                 if (checkWallCollideAt(lx, ly, 3)) {
@@ -233,12 +416,10 @@ class Tank {
         ctx.fill();
         ctx.restore();
 
-        // 2. Tank Body
+        // 2. Tank Body (Vector Shadow for 60 FPS performance without shadowBlur)
         ctx.save();
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        ctx.shadowBlur = 10;
-        ctx.shadowOffsetX = 3;
-        ctx.shadowOffsetY = 3;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.fillRect(-this.radius + 6, -this.radius + 6, (this.radius - 3) * 2, (this.radius - 3) * 2);
 
         ctx.rotate(this.bodyAngle);
 
@@ -600,8 +781,6 @@ class SupportTank extends Tank {
 
     drawTankBody(ctx) {
         ctx.save();
-        ctx.shadowColor = '#a855f7';
-        ctx.shadowBlur = 18;
 
         ctx.rotate(this.bodyAngle);
         ctx.fillStyle = '#1e1b4b';
