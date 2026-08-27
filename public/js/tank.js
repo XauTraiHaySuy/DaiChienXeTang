@@ -14,6 +14,7 @@ class Tank {
         this.speed = this.baseSpeed;
         this.alive = true;
         this.cooldown = 0;
+        this.isReady = false; // Co-op Lobby Ready State
 
         // Status Effects (Stun, EMP Slow & Bee Stung)
         this.stunTimer = 0; // Frames immobilized (3s = 180 frames)
@@ -258,8 +259,14 @@ class Tank {
             }
 
             // Muzzle explosion on near face of wall
-            createMuzzleFlash(muzzle.x, muzzle.y, this.turretAngle, this.isPlayer);
+            createMuzzleFlash(muzzle.x, muzzle.y, this.turretAngle, this);
             createExplosion(muzzle.x, muzzle.y, true);
+
+            // TRONG SẢNH CHỜ (LOBBY MAP -1): TUYỆT ĐỐI KHÔNG NỔ CHẾT DÙ BẮN VÀO TƯỜNG!
+            if (typeof currentMapIndex !== 'undefined' && currentMapIndex === -1) {
+                if (typeof createSparks === 'function') createSparks(muzzle.x, muzzle.y);
+                return true;
+            }
 
             // Bounced backward bullet heading right back at the tank
             const backAngle = this.turretAngle + Math.PI;
@@ -274,11 +281,16 @@ class Tank {
             return true;
         }
 
-        bullets.push(new Bullet(muzzle.x, muzzle.y, this.turretAngle, this));
+        const b = new Bullet(muzzle.x, muzzle.y, this.turretAngle, this);
+        bullets.push(b);
         this.cooldown = 18;
 
+        if (typeof gameMode !== 'undefined' && gameMode === 'COOP' && typeof Multiplayer !== 'undefined') {
+            Multiplayer.sendShoot(muzzle.x, muzzle.y, this.turretAngle, b.speed || 8);
+        }
+
         this.recoilOffset = 6;
-        createMuzzleFlash(muzzle.x, muzzle.y, this.turretAngle, this.isPlayer);
+        createMuzzleFlash(muzzle.x, muzzle.y, this.turretAngle, this);
         audio.playShoot(this.isPlayer);
         return true;
     }
@@ -495,6 +507,37 @@ class Tank {
         ctx.stroke();
 
         ctx.restore();
+
+        // Overhead Player Name & Ready Badge rendering in Co-op mode
+        const pName = this.playerName || (typeof Multiplayer !== 'undefined' && Multiplayer.players ? (Multiplayer.players.find(p => p.slotIndex === this.slotIndex)?.playerName) : null);
+        
+        if (pName || this.isReady) {
+            ctx.save();
+            ctx.textAlign = 'center';
+            const nameY = -this.radius - 14;
+
+            // 1. Draw Player Name (Blue team = Cyan #38bdf8, Red team = Red #ef4444)
+            if (pName) {
+                const isRedTeam = (this.team === 'red') || (this.color && (this.color.border === '#ef4444' || this.color.border === '#f97316'));
+                ctx.font = 'bold 12px "Outfit", sans-serif';
+                ctx.fillStyle = isRedTeam ? '#ef4444' : '#38bdf8';
+                ctx.shadowColor = isRedTeam ? 'rgba(239, 68, 68, 0.6)' : 'rgba(56, 189, 248, 0.6)';
+                ctx.shadowBlur = 6;
+                ctx.fillText(pName, 0, nameY);
+            }
+
+            // 2. Draw "✓ SẴN SÀNG" Badge above Player Name
+            if (this.isReady) {
+                const readyY = pName ? (nameY - 16) : nameY;
+                ctx.font = '900 12px "Outfit", sans-serif';
+                ctx.fillStyle = '#4ade80';
+                ctx.shadowColor = '#4ade80';
+                ctx.shadowBlur = 10;
+                ctx.fillText('✓ SẴN SÀNG', 0, readyY);
+            }
+
+            ctx.restore();
+        }
 
         ctx.restore();
     }

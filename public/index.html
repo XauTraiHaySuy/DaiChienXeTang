@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Đại Chiến Xe Tăng</title>
+    <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
     <!-- Google Fonts for Perfect Vietnamese Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -80,9 +81,70 @@
             max-width: 100vw;
             object-fit: contain;
             margin: 0 auto;
+            transition: margin-top 0.2s ease;
+        }
+
+        canvas#gameCanvas.lobby-mode {
+            margin-top: 44px !important;
+            max-height: calc(100vh - 92px) !important;
         }
 
         /* Overlay UI Screens */
+        .coop-vote-card.selected {
+            border-color: #38bdf8 !important;
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.6) !important;
+            background: rgba(14, 165, 233, 0.25) !important;
+            transform: scale(1.04);
+        }
+
+        .coop-vote-card.blink-highlight {
+            animation: blinkPulse 0.25s infinite alternate !important;
+        }
+
+        @keyframes blinkPulse {
+            0% {
+                border-color: #facc15;
+                box-shadow: 0 0 35px rgba(250, 204, 21, 0.9);
+                background: rgba(250, 204, 21, 0.35);
+            }
+
+            100% {
+                border-color: #38bdf8;
+                box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+                background: rgba(30, 41, 59, 0.8);
+            }
+        }
+
+        .dots-anim::after {
+            display: inline-block;
+            content: '.';
+            animation: mapWaitingDots 1.6s infinite steps(1, end);
+            width: 24px;
+            text-align: left;
+        }
+
+        @keyframes mapWaitingDots {
+            0% {
+                content: '.';
+            }
+
+            25% {
+                content: '..';
+            }
+
+            50% {
+                content: '...';
+            }
+
+            75% {
+                content: '';
+            }
+
+            100% {
+                content: '.';
+            }
+        }
+
         .overlay-screen {
             position: absolute;
             top: 0;
@@ -972,10 +1034,156 @@
             box-shadow: 0 0 25px #facc15;
             transform: scale(1.05);
         }
+
+        @keyframes modalPopIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.82) translateY(22px);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        @keyframes screenFadeIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.97);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .screen-fade-in {
+            animation: screenFadeIn 0.3s ease-out forwards;
+        }
+
+        /* Animated 3-Dot Ellipsis */
+        @keyframes dotsAnim {
+            0% {
+                content: "";
+            }
+
+            25% {
+                content: ".";
+            }
+
+            50% {
+                content: "..";
+            }
+
+            75% {
+                content: "...";
+            }
+
+            100% {
+                content: "";
+            }
+        }
+
+        .animated-dots::after {
+            display: inline-block;
+            content: "";
+            animation: dotsAnim 2.0s infinite steps(1);
+            width: 24px;
+            text-align: left;
+        }
+
+        /* Top-Right Sleek Toast Notification Container */
+        @keyframes toastSlideIn {
+            0% {
+                opacity: 0;
+                transform: translateX(120%) scale(0.9);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateX(0) scale(1);
+            }
+        }
+
+        @keyframes toastSlideOut {
+            0% {
+                opacity: 1;
+                transform: translateX(0) scale(1);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateX(120%) scale(0.9);
+            }
+        }
+
+        @keyframes toastProgress {
+            0% {
+                width: 100%;
+            }
+
+            100% {
+                width: 0%;
+            }
+        }
+
+        .toast-item {
+            pointer-events: auto;
+            background: rgba(15, 23, 42, 0.94);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(56, 189, 248, 0.6);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.3);
+            border-radius: 12px;
+            padding: 14px 18px;
+            color: #f8fafc;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+            overflow: hidden;
+            animation: toastSlideIn 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .toast-item.error {
+            border-color: rgba(239, 68, 68, 0.8);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 20px rgba(239, 68, 68, 0.4);
+        }
+
+        .toast-item.warning {
+            border-color: rgba(245, 158, 11, 0.8);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 20px rgba(245, 158, 11, 0.4);
+        }
+
+        .toast-item .toast-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #38bdf8, #818cf8);
+            animation: toastProgress 4s linear forwards;
+        }
+
+        .toast-item.error .toast-progress {
+            background: linear-gradient(90deg, #ef4444, #f97316);
+        }
+
+        .toast-item.warning .toast-progress {
+            background: linear-gradient(90deg, #f59e0b, #eab308);
+        }
     </style>
 </head>
 
 <body>
+
+    <!-- Top-Right Sleek Toast Notification Container -->
+    <div id="toast-container"
+        style="position: fixed; top: 24px; right: 24px; z-index: 99999; display: flex; flex-direction: column; gap: 12px; pointer-events: none; max-width: 400px; width: 90%;">
+    </div>
 
     <!-- Full Screen Animated Canvas Background -->
     <canvas id="menu-bg-canvas"></canvas>
@@ -1038,12 +1246,11 @@
                         <span class="btn-main-text">BẮT ĐẦU</span>
                     </div>
                 </button>
-                <button id="coop-btn" class="v-menu-btn btn-coop btn-locked">
+                <button id="coop-btn" class="v-menu-btn btn-coop">
                     <div class="btn-text-group">
                         <span class="btn-main-text">CHƠI NHIỀU NGƯỜI</span>
                         <span class="btn-sub-text">(CO OP)</span>
                     </div>
-                    <div class="btn-lock-overlay">🔒</div>
                 </button>
                 <button id="auth-btn" class="v-menu-btn btn-account btn-locked">
                     <div class="btn-text-group">
@@ -1051,6 +1258,272 @@
                     </div>
                     <div class="btn-lock-overlay">🔒</div>
                 </button>
+            </div>
+        </div>
+
+        <!-- Player Capacity Selection Modal (Chọn Chế độ 2 người hay 4 người) -->
+        <div id="coop-mode-select-modal" class="overlay-screen hidden"
+            style="background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(8px); z-index: 1100; display: flex; align-items: center; justify-content: center;">
+            <div class="game-modal-card modal-pop-anim"
+                style="max-width: 520px; width: 90%; border: 2px solid #a855f7; box-shadow: 0 0 40px rgba(168, 85, 247, 0.4); padding: 26px; text-align: center; background: rgba(15, 23, 42, 0.96); border-radius: 16px;">
+                <h2
+                    style="color: #c084fc; text-shadow: 0 0 20px rgba(192, 132, 252, 0.6); margin-bottom: 8px; font-size: 1.7rem; font-weight: 900;">
+                    CHỌN SỐ LƯỢNG NGƯỜI CHƠI
+                </h2>
+                <p style="color: #cbd5e1; font-size: 0.95rem; margin-bottom: 22px;">
+                    Bạn muốn tạo hoặc tham gia phòng đấu mấy người?
+                </p>
+
+                <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
+                    <!-- Option 1: 2 Players -->
+                    <div onclick="Multiplayer.selectCoopMode(2)"
+                        style="background: rgba(30, 41, 59, 0.8); border: 2px solid #38bdf8; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.25s ease; text-align: left; display: flex; align-items: center; gap: 16px;">
+                        <div style="font-size: 2.2rem;">⚔️</div>
+                        <div style="flex: 1;">
+                            <div style="color: #38bdf8; font-weight: 800; font-size: 1.15rem;">CHẾ ĐỘ 2 NGƯỜI (1v1)
+                            </div>
+                            <div style="color: #94a3b8; font-size: 0.85rem; margin-top: 4px;">Thách đấu 1v1 trực tiếp
+                                trên 2 máy. Phòng tối đa 2 người chơi.</div>
+                        </div>
+                    </div>
+
+                    <!-- Option 2: 4 Players -->
+                    <div onclick="Multiplayer.selectCoopMode(4)"
+                        style="background: rgba(30, 41, 59, 0.8); border: 2px solid #a855f7; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.25s ease; text-align: left; display: flex; align-items: center; gap: 16px;">
+                        <div style="font-size: 2.2rem;">🔥</div>
+                        <div style="flex: 1;">
+                            <div style="color: #c084fc; font-weight: 800; font-size: 1.15rem;">CHẾ ĐỘ 4 NGƯỜI (2v2)
+                            </div>
+                            <div style="color: #94a3b8; font-size: 0.85rem; margin-top: 4px;">Đấu nhóm tối đa 4 người.
+                                Hỗ trợ 3 người chơi (1 người chấp 2 người) hoặc 4 người (2v2).</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="Multiplayer.backToHomepage()" class="hud-btn"
+                    style="color: #94a3b8; border-color: #475569; width: 100%; padding: 10px; font-weight: 700;">
+                    QUAY LẠI MENU CHÍNH
+                </button>
+            </div>
+        </div>
+
+        <!-- Real-Time Co-op Room Selection Modal -->
+        <div id="coop-modal" class="overlay-screen hidden">
+            <div class="game-modal-card modal-pop-anim"
+                style="max-width: 520px; width: 90%; border: 2px solid rgba(56, 189, 248, 0.6); box-shadow: 0 0 40px rgba(56, 189, 248, 0.3);">
+                <h2 id="coop-modal-title"
+                    style="color: #38bdf8; text-shadow: 0 0 20px rgba(56, 189, 248, 0.6); margin-bottom: 8px; font-size: 1.8rem;">
+                    CHẾ ĐỘ 1 VS 1
+                </h2>
+                <p id="coop-modal-subtitle" style="color: #cbd5e1; font-size: 0.95rem; margin-bottom: 20px;">
+                    Thách đấu 1 vs 1 trên 2 máy khác nhau.
+                </p>
+
+                <!-- Player Name Input Box (Tên Người Chơi Bắt Buộc) -->
+                <div style="margin-bottom: 16px; text-align: left;">
+                    <label
+                        style="color: #38bdf8; font-weight: 700; font-size: 0.88rem; display: block; margin-bottom: 6px;">
+                        👤 TÊN NGƯỜI CHƠI (BẮT BUỘC):
+                    </label>
+                    <input type="text" id="coop-username-input" placeholder="Nhập tên xe tăng của bạn..." maxlength="16"
+                        style="width: 100%; padding: 12px 14px; border-radius: 8px; border: 2px solid #38bdf8; background: #0f172a; color: #f8fafc; font-size: 1.05rem; font-weight: 700; outline: none; box-sizing: border-box;">
+                </div>
+
+                <!-- In-Game Sleek Notification Banner -->
+                <div id="coop-modal-msg" class="hidden"
+                    style="padding: 10px 14px; border-radius: 8px; font-weight: 700; font-size: 0.95rem; margin-bottom: 15px; text-align: center;">
+                </div>
+
+                <!-- Room Action Buttons -->
+                <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
+                    <button id="create-room-btn" class="btn"
+                        style="background: linear-gradient(135deg, #22c55e, #15803d); font-size: 1.1rem; padding: 14px;">
+                        TẠO PHÒNG MỚI (HOST)
+                    </button>
+
+                    <div style="display: flex; gap: 10px; align-items: center; justify-content: center;">
+                        <input type="text" id="join-room-input" placeholder="NHẬP MÃ PHÒNG (VD: A8K2X9)" maxlength="6"
+                            style="flex: 1; padding: 12px; border-radius: 8px; border: 2px solid #38bdf8; background: #0f172a; color: #f8fafc; font-size: 1.1rem; text-align: center; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">
+                        <button id="join-room-btn" class="btn"
+                            style="background: linear-gradient(135deg, #38bdf8, #0284c7); font-size: 1rem; padding: 12px 20px;">
+                            VÀO PHÒNG
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Room Waiting Info Box -->
+                <div id="room-info-box" class="hidden"
+                    style="background: rgba(15, 23, 42, 0.9); border: 1px dashed #38bdf8; border-radius: 10px; padding: 15px; margin-bottom: 20px;">
+                    <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 6px;">MÃ PHÒNG CỦA BẠN:</p>
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin: 8px 0;">
+                        <div style="font-size: 2.2rem; font-weight: 900; color: #facc15; letter-spacing: 4px; font-family: monospace; background: #0f172a; padding: 6px 18px; border-radius: 8px; border: 2px solid #38bdf8;"
+                            id="display-created-code">
+                            ------
+                        </div>
+                        <button id="copy-code-btn" class="hud-btn"
+                            style="color: #38bdf8; border-color: #38bdf8; padding: 8px 12px; font-size: 0.9rem;"
+                            title="Sao chép mã phòng">
+                            Copy
+                        </button>
+                        <button id="refresh-code-btn" class="hud-btn"
+                            style="color: #facc15; border-color: #facc15; padding: 8px 12px; font-size: 0.9rem;"
+                            title="Lấy mã mới">
+                            Đổi Mã
+                        </button>
+                    </div>
+                    <button id="enter-lobby-host-btn" class="btn"
+                        style="background: linear-gradient(135deg, #22c55e, #15803d); width: 100%; margin-top: 10px; padding: 12px; font-size: 1.05rem;">
+                        VÀO SẢNH CHỜ
+                    </button>
+                </div>
+
+                <button id="close-coop-modal-btn" class="hud-btn"
+                    style="color: #ef4444; border-color: #ef4444; width: 100%;">
+                    Quay Lại Menu Chính
+                </button>
+            </div>
+        </div>
+
+        <!-- Lobby Map Overlay (Sảnh Chờ 4 Bức Tường - Nút Sẵn Sàng Header) -->
+        <div id="lobby-vote-overlay" class="overlay-screen hidden"
+            style="background: transparent; pointer-events: none; z-index: 200;">
+            <div
+                style="pointer-events: auto; position: absolute; top: 4px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.95); border: 1.5px solid rgba(56, 189, 248, 0.6); box-shadow: 0 0 15px rgba(56, 189, 248, 0.25); border-radius: 9px; padding: 5px 18px; text-align: center; max-width: 700px; width: 90%; backdrop-filter: blur(10px);">
+
+                <!-- Lobby Header Stats -->
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px;">
+                    <span style="color: #38bdf8; font-size: 0.88rem; font-weight: 700;">MÃ PHÒNG: <strong
+                            id="coop-room-code-display"
+                            style="color: #facc15; font-family: monospace; font-size: 1.05rem; letter-spacing: 0.5px;">---</strong></span>
+                    <span style="color: #cbd5e1; font-size: 0.88rem; font-weight: 800;" id="coop-score-display">Xanh
+                        (Host): 0 - 0 (Guest) Đỏ</span>
+
+                    <!-- Action Buttons (Nhỏ gọn phom mini badge) -->
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <button id="coop-ready-btn" class="btn"
+                            style="background: linear-gradient(135deg, #22c55e, #16a34a); padding: 2px 7px; font-weight: 800; font-size: 0.65rem; border-radius: 4px; letter-spacing: 0.3px; box-shadow: 0 0 6px rgba(34, 197, 94, 0.4); line-height: 1.3; white-space: nowrap;">
+                            SẴN SÀNG
+                        </button>
+
+                        <button onclick="Multiplayer.confirmLeaveRoom()" class="hud-btn"
+                            style="color: #ef4444; border: 1px solid #ef4444; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; line-height: 1.3;">Rời
+                            Phòng</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3-Second Ready Countdown Overlay -->
+        <div id="coop-ready-countdown" class="overlay-screen hidden"
+            style="background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(6px); display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; z-index: 999;">
+            <div
+                style="color: #4ade80; font-size: 1.6rem; font-weight: 800; text-shadow: 0 0 20px rgba(74, 222, 128, 0.8); margin-bottom: 10px;">
+                CẢ 2 ĐÃ SẴN SÀNG! CHUẨN BỊ VOTE MAP...
+            </div>
+            <div id="coop-ready-countdown-num"
+                style="color: #facc15; font-size: 6rem; font-weight: 900; font-family: monospace; text-shadow: 0 0 40px rgba(250, 204, 21, 0.9); animation: pulse 0.5s infinite alternate;">
+                3
+            </div>
+        </div>
+
+        <!-- Centered Map Vote Modal (Phủ lớp mờ đen giữa màn hình) -->
+        <div id="coop-vote-modal" class="overlay-screen hidden"
+            style="background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(12px); z-index: 1000;">
+            <div id="coop-vote-card-modal" class="game-modal-card"
+                style="max-width: 780px; width: 92%; border: 2px solid #38bdf8; box-shadow: 0 0 50px rgba(56, 189, 248, 0.5); padding: 24px; text-align: center; transition: all 0.3s ease;">
+                <h2 id="coop-vote-title"
+                    style="color: #38bdf8; text-shadow: 0 0 20px rgba(56, 189, 248, 0.8); margin-bottom: 8px; font-size: 1.8rem; transition: all 0.3s ease;">
+                    CHỌN BẢN ĐỒ VÁN ĐẤU
+                </h2>
+
+                <div
+                    style="font-size: 1.1rem; font-weight: 800; margin-bottom: 16px; display: flex; justify-content: center; align-items: center; gap: 12px;">
+                    <span id="coop-vote-turn-display">LƯỢT BẠN CHỌN MAP!</span>
+                    <span id="coop-vote-timer"
+                        style="background: rgba(250, 204, 21, 0.15); border: 1px solid #facc15; color: #facc15; padding: 4px 12px; border-radius: 14px; font-weight: 900; font-size: 1rem; font-family: monospace;">10s</span>
+                </div>
+
+                <!-- 3 Map Cards -->
+                <div style="display: flex; gap: 14px; justify-content: center; margin-bottom: 20px;">
+                    <div id="vote-card-0" class="coop-vote-card selected" onclick="Multiplayer.voteMap(0)"
+                        style="flex: 1; background: rgba(30, 41, 59, 0.8); border: 2px solid #334155; border-radius: 12px; padding: 14px; cursor: pointer; transition: all 0.25s ease;">
+                        <div style="color: #f8fafc; font-weight: 800; font-size: 1rem; margin-top: 6px;">1. Rừng Rậm Hổ
+                            Dữ</div>
+                        <div style="color: #94a3b8; font-size: 0.8rem; margin-top: 4px;">3 Con Hổ hung dữ vồ sát thủ
+                        </div>
+                    </div>
+                    <div id="vote-card-1" class="coop-vote-card" onclick="Multiplayer.voteMap(1)"
+                        style="flex: 1; background: rgba(30, 41, 59, 0.8); border: 2px solid #334155; border-radius: 12px; padding: 14px; cursor: pointer; transition: all 0.25s ease;">
+                        <div style="color: #f8fafc; font-weight: 800; font-size: 1rem; margin-top: 6px;">2. Thành Phố
+                            Bão Bom</div>
+                        <div style="color: #94a3b8; font-size: 0.8rem; margin-top: 4px;">Máy bay thả bom hạt nhân</div>
+                    </div>
+                    <div id="vote-card-2" class="coop-vote-card" onclick="Multiplayer.voteMap(2)"
+                        style="flex: 1; background: rgba(30, 41, 59, 0.8); border: 2px solid #334155; border-radius: 12px; padding: 14px; cursor: pointer; transition: all 0.25s ease;">
+                        <div style="color: #f8fafc; font-weight: 800; font-size: 1rem; margin-top: 6px;">3. Băng Tuyết
+                            Trơn</div>
+                        <div style="color: #94a3b8; font-size: 0.8rem; margin-top: 4px;">Sương mù & bão tuyết trơn</div>
+                    </div>
+                </div>
+
+                <div id="coop-vote-status-msg"
+                    style="color: #4ade80; font-weight: 700; font-size: 1.05rem; min-height: 28px;">
+                    Nhấn vào map để chọn (Vào ván sau 3 giây)
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Leave Room Confirmation Modal (Thông báo nhỏ giữa màn hình) -->
+        <div id="coop-leave-confirm-modal" class="overlay-screen hidden"
+            style="background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); z-index: 1200; display: flex; align-items: center; justify-content: center;">
+            <div class="game-modal-card"
+                style="max-width: 440px; width: 88%; border: 2px solid #ef4444; box-shadow: 0 0 35px rgba(239, 68, 68, 0.4); padding: 22px 24px; text-align: center; background: rgba(15, 23, 42, 0.96); border-radius: 14px;">
+                <h3
+                    style="color: #ef4444; font-size: 1.25rem; font-weight: 800; margin-bottom: 12px; text-shadow: 0 0 15px rgba(239, 68, 68, 0.5);">
+                    XÁC NHẬN RỜI PHÒNG
+                </h3>
+                <p id="coop-leave-confirm-text"
+                    style="color: #cbd5e1; font-size: 0.92rem; font-weight: 600; line-height: 1.5; margin-bottom: 20px;">
+                    Bạn có chắc chắn muốn rời phòng không?
+                </p>
+                <div style="display: flex; gap: 12px; justify-content: center;">
+                    <button onclick="Multiplayer.cancelLeaveRoom()" class="hud-btn"
+                        style="color: #94a3b8; border-color: #475569; flex: 1; padding: 8px 16px; font-weight: 700; font-size: 0.88rem; border-radius: 6px;">
+                        HỦY BỎ
+                    </button>
+                    <button onclick="Multiplayer.executeLeaveRoom()" class="btn"
+                        style="background: linear-gradient(135deg, #ef4444, #dc2626); flex: 1; padding: 8px 16px; font-weight: 800; font-size: 0.88rem; border-radius: 6px; box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);">
+                        RỜI PHÒNG
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Spectator Confirmation Modal (Khán Giả Xem Trực Tiếp) -->
+        <div id="coop-spectator-modal" class="overlay-screen hidden"
+            style="background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); z-index: 1250; display: flex; align-items: center; justify-content: center;">
+            <div class="game-modal-card"
+                style="max-width: 440px; width: 88%; border: 2px solid #38bdf8; box-shadow: 0 0 35px rgba(56, 189, 248, 0.4); padding: 22px 24px; text-align: center; background: rgba(15, 23, 42, 0.96); border-radius: 14px;">
+                <h3
+                    style="color: #38bdf8; font-size: 1.25rem; font-weight: 800; margin-bottom: 12px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.5);">
+                    TRẬN ĐẤU ĐANG DIỄN RA
+                </h3>
+                <p style="color: #cbd5e1; font-size: 0.92rem; font-weight: 600; line-height: 1.5; margin-bottom: 20px;">
+                    Phòng này đang trong ván đấu! Bạn có muốn vào <span style="color: #38bdf8; font-weight: 800;">XEM
+                        TRỰC TIẾP</span> không?<br>
+                    <span style="font-size: 0.82rem; color: #94a3b8;">(Bạn sẽ tự động tham gia thi đấu chính thức ở ván
+                        tiếp theo)</span>
+                </p>
+                <div style="display: flex; gap: 12px; justify-content: center;">
+                    <button onclick="Multiplayer.cancelSpectator()" class="hud-btn"
+                        style="color: #94a3b8; border-color: #475569; flex: 1; padding: 8px 16px; font-weight: 700; font-size: 0.88rem; border-radius: 6px;">
+                        HỦY BỎ
+                    </button>
+                    <button onclick="Multiplayer.joinAsSpectator()" class="btn"
+                        style="background: linear-gradient(135deg, #38bdf8, #0284c7); flex: 1; padding: 8px 16px; font-weight: 800; font-size: 0.88rem; border-radius: 6px; box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);">
+                        VÀO XEM TRẬN
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -1188,6 +1661,7 @@
 
     <!-- Modular JavaScript Files -->
     <script src="js/audio.js"></script>
+    <script src="js/multiplayer.js"></script>
     <script src="js/particle.js"></script>
     <script src="js/tank.js"></script>
     <script src="js/bullet.js"></script>

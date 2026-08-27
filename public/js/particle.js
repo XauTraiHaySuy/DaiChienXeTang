@@ -100,8 +100,17 @@ function triggerScreenShake(intensity = 8, duration = 15) {
     screenShakeTimer = duration;
 }
 
-function createMuzzleFlash(x, y, angle, isPlayer = true) {
-    const color = isPlayer ? '#38bdf8' : '#f87171';
+function createMuzzleFlash(x, y, angle, colorOrIsBlue = true) {
+    let color = '#38bdf8';
+    if (typeof colorOrIsBlue === 'string') {
+        color = colorOrIsBlue;
+    } else if (colorOrIsBlue === false) {
+        color = '#f87171';
+    } else if (typeof colorOrIsBlue === 'object' && colorOrIsBlue !== null) {
+        const t = colorOrIsBlue;
+        const isRed = (t.team === 'red') || (t.color && (t.color.border === '#ef4444' || t.color.border === '#f97316'));
+        color = isRed ? '#f87171' : '#38bdf8';
+    }
     for (let i = 0; i < 6; i++) {
         const spread = (Math.random() - 0.5) * 0.6;
         const speed = Math.random() * 4 + 2;

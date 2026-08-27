@@ -108,9 +108,22 @@ class Bullet {
     draw(ctx) {
         if (!this.alive) return;
 
-        const isPlayer = this.owner && this.owner.isPlayer;
-        const mainColor = isPlayer ? '#38bdf8' : '#ef4444';
-        const glowColor = isPlayer ? '#0284c7' : '#dc2626';
+        let isRed = false;
+        if (this.owner) {
+            if (this.owner.team === 'red') isRed = true;
+            else if (this.owner.team === 'blue') isRed = false;
+            else if (this.owner.color) {
+                const bCol = this.owner.color.border;
+                if (bCol === '#ef4444' || bCol === '#f97316' || bCol === '#dc2626') isRed = true;
+                else if (bCol === '#38bdf8' || bCol === '#22d3ee' || bCol === '#0284c7') isRed = false;
+            }
+        } else if (this.team === 'red') {
+            isRed = true;
+        }
+
+        const mainColor = isRed ? '#ef4444' : '#38bdf8';
+        const glowColor = isRed ? '#dc2626' : '#0284c7';
+        const glowRgb = isRed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(56, 189, 248, 0.35)';
 
         // Draw Bullet Motion Trail
         ctx.save();
@@ -130,7 +143,7 @@ class Bullet {
         ctx.globalAlpha = Math.min(1, (this.life / 20)); // Fade out near end of 4s
         
         // Outer Glow Circle (Lightweight vector glow)
-        ctx.fillStyle = isPlayer ? 'rgba(56, 189, 248, 0.35)' : 'rgba(239, 68, 68, 0.35)';
+        ctx.fillStyle = glowRgb;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius * 1.7, 0, Math.PI * 2);
         ctx.fill();

@@ -436,11 +436,27 @@ function randomizeElectricMaze() {
     }
 }
 
+const LOBBY_MAP_DEF = {
+    name: "SẢNH CHỜ (LOBBY - BẮN KHÔNG CHẾT)",
+    desc: "Sảnh chờ 4 bức tường. Thỏa sức di chuyển & bắn thử đạn (Không mất máu).",
+    pro: "🛡️ Trạng thái: An toàn 100%. Bắn đạn nảy thử thoải mái.",
+    con: "🎯 Hãy chọn Bản đồ ván đấu bên trên để bắt đầu!",
+    playerSpawn: { x: 250, y: 375 },
+    enemySpawns: []
+};
+
+function getMapDefinition(idx) {
+    if (idx === -1 || idx === 'LOBBY') return LOBBY_MAP_DEF;
+    return MAP_DEFINITIONS[Math.abs(idx) % 3] || MAP_DEFINITIONS[0];
+}
+
 function buildMaze(mapIdx = null) {
-    if (mapIdx === null) {
+    if (mapIdx === -1 || mapIdx === 'LOBBY') {
+        currentMapIndex = -1;
+    } else if (mapIdx === null) {
         currentMapIndex = Math.floor(Math.random() * 3); // Random equal probability 1/3 across active 3 maps
     } else {
-        currentMapIndex = mapIdx % 3; // Active 3 maps (0: Tiger, 1: Bomb, 2: Snowstorm)
+        currentMapIndex = Math.abs(mapIdx) % 3; // Active 3 maps (0: Tiger, 1: Bomb, 2: Snowstorm)
     }
 
     walls.length = 0;
@@ -467,16 +483,21 @@ function buildMaze(mapIdx = null) {
         audio.stopElectricHum();
     }
 
-    const mapDef = MAP_DEFINITIONS[currentMapIndex];
-
     // Boundary Outer Walls
     walls.push({ x: 0, y: 0, w: CANVAS_WIDTH, h: WALL_THICKNESS, type: 'metal' });
     walls.push({ x: 0, y: CANVAS_HEIGHT - WALL_THICKNESS, w: CANVAS_WIDTH, h: WALL_THICKNESS, type: 'metal' });
     walls.push({ x: 0, y: 0, w: WALL_THICKNESS, h: CANVAS_HEIGHT, type: 'metal' });
     walls.push({ x: CANVAS_WIDTH - WALL_THICKNESS, y: 0, w: WALL_THICKNESS, h: CANVAS_HEIGHT, type: 'metal' });
 
-    // Build Obstacles
-    mapDef.builder(walls);
+    if (currentMapIndex === -1) {
+        // --- SẢNH CHỜ (LOBBY MAP - 4 BỨC TƯỜNG, BẮN KHÔNG CHẾT) ---
+        return;
+    }
+
+    const mapDef = MAP_DEFINITIONS[currentMapIndex];
+    if (mapDef && mapDef.builder) {
+        mapDef.builder(walls);
+    }
 
     // Spawn Special Map Entities
     if (currentMapIndex === 0) {
